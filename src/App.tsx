@@ -11,6 +11,7 @@ export default function App() {
     items,
     selectedId,
     selectedItem,
+    overlappingItemIds,
     snapSize,
     savedLayouts,
     canUndo,
@@ -21,6 +22,7 @@ export default function App() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
+    toggleDoorSwing,
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,
@@ -57,6 +59,7 @@ export default function App() {
           room={room}
           items={items}
           selectedId={selectedId}
+          overlappingItemIds={overlappingItemIds}
           onSelect={selectFurniture}
           onMoveStart={beginFurnitureMove}
           onMove={moveFurniture}
@@ -64,9 +67,11 @@ export default function App() {
         <InspectorPanel
           room={room}
           item={selectedItem}
+          isOverlapping={selectedItem ? overlappingItemIds.has(selectedItem.id) : false}
           snapSize={snapSize}
           savedLayouts={savedLayouts}
           onRotate={rotateFurniture}
+          onToggleDoorSwing={toggleDoorSwing}
           onDuplicate={duplicateFurniture}
           onDeleteFurniture={deleteFurniture}
           onUpdateFurniture={updateFurnitureGeometry}

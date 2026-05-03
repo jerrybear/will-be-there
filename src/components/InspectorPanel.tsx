@@ -9,9 +9,11 @@ import { getRotatedSize } from '../types/layout';
 interface InspectorPanelProps {
   room: Room;
   item: PlacedFurniture | null;
+  isOverlapping: boolean;
   snapSize: SnapSize;
   savedLayouts: SavedLayout[];
   onRotate: (id: string) => void;
+  onToggleDoorSwing: (id: string) => void;
   onDuplicate: (id: string) => void;
   onDeleteFurniture: (id: string) => void;
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
@@ -41,9 +43,11 @@ function hasValidNumberDraft(values: string[]) {
 export function InspectorPanel({
   room,
   item,
+  isOverlapping,
   snapSize,
   savedLayouts,
   onRotate,
+  onToggleDoorSwing,
   onDuplicate,
   onDeleteFurniture,
   onUpdateFurniture,
@@ -325,7 +329,13 @@ export function InspectorPanel({
     <section className="panel inspector-panel">
       <div className="panel-header">
         <h2>{item.label}</h2>
-        <p>현재 선택된 가구의 배치 정보입니다.</p>
+        {isOverlapping ? (
+          <div className="overlap-warning">
+            ⚠️ 다른 가구와 겹쳐 있습니다
+          </div>
+        ) : (
+          <p>현재 선택된 가구의 배치 정보입니다.</p>
+        )}
       </div>
 
       {snapSection}
@@ -365,6 +375,11 @@ export function InspectorPanel({
       <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
         90도 회전
       </button>
+      {item.templateId === 'door' && (
+        <button type="button" className="primary-button" style={{ marginTop: 8 }} onClick={() => onToggleDoorSwing(item.id)}>
+          🚪 열림 방향 변경
+        </button>
+      )}
       <div className="furniture-actions">
         <button type="button" className="ghost-button" onClick={() => onDuplicate(item.id)}>
           복제

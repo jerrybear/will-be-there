@@ -27,6 +27,7 @@ export interface PlacedFurniture extends Size, Position {
   color: string;
   rotation: Rotation;
   isWallAttached?: boolean;
+  doorSwing?: 0 | 1 | 2 | 3 | null;
 }
 
 export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {}

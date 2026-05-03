@@ -152,6 +152,33 @@ export function useRoomLayout() {
     [items, selectedId],
   );
 
+  const overlappingItemIds = useMemo(() => {
+    const ids = new Set<string>();
+    const checkItems = items.filter((item) => !item.isWallAttached);
+
+    for (let i = 0; i < checkItems.length; i++) {
+      for (let j = i + 1; j < checkItems.length; j++) {
+        const a = checkItems[i];
+        const b = checkItems[j];
+        const sizeA = getRotatedSize(a);
+        const sizeB = getRotatedSize(b);
+
+        const overlap = (
+          a.x < b.x + sizeB.width &&
+          a.x + sizeA.width > b.x &&
+          a.y < b.y + sizeB.height &&
+          a.y + sizeA.height > b.y
+        );
+
+        if (overlap) {
+          ids.add(a.id);
+          ids.add(b.id);
+        }
+      }
+    }
+    return ids;
+  }, [items]);
+
   const createLayoutSnapshot = (): LayoutHistorySnapshot => ({
     room,
     items,
@@ -280,6 +307,27 @@ export function useRoomLayout() {
         return {
           ...nextItem,
           ...position,
+        };
+      }),
+    );
+  };
+
+  const toggleDoorSwing = (id: string) => {
+    recordHistory();
+    setItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.id !== id) return item;
+        
+        let nextSwing: 0 | 1 | 2 | 3 | null = null;
+        if (item.doorSwing == null) nextSwing = 0;
+        else if (item.doorSwing === 0) nextSwing = 1;
+        else if (item.doorSwing === 1) nextSwing = 2;
+        else if (item.doorSwing === 2) nextSwing = 3;
+        else if (item.doorSwing === 3) nextSwing = null;
+
+        return {
+          ...item,
+          doorSwing: nextSwing,
         };
       }),
     );
@@ -426,6 +474,7 @@ export function useRoomLayout() {
     items,
     selectedId,
     selectedItem,
+    overlappingItemIds,
     snapSize,
     savedLayouts,
     canUndo: pastLayouts.length > 0,
@@ -436,6 +485,7 @@ export function useRoomLayout() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
+    toggleDoorSwing,
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,

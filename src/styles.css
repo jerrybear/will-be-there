@@ -228,8 +228,51 @@ button {
   display: none;
 }
 
+.furniture-item.is-door {
+  overflow: visible;
+}
+
+.door-swing-arc {
+  position: absolute;
+  pointer-events: none;
+  background-color: rgba(100, 116, 139, 0.15);
+  box-sizing: border-box;
+  z-index: 0;
+}
+
+.furniture-item.is-door span,
+.furniture-item.is-door .overlap-badge {
+  position: relative;
+  z-index: 1;
+}
+
 .furniture-item:active {
   cursor: grabbing;
+}
+
+.furniture-item.is-overlapping {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.4);
+}
+
+.furniture-item.is-selected.is-overlapping {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+.overlap-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 12px;
+  background: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .furniture-item.is-selected {
@@ -279,6 +322,20 @@ button {
 .empty-state {
   padding: 18px;
   color: #5b6473;
+}
+
+.overlap-warning {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #fecaca;
 }
 
 .primary-button,
