@@ -23,6 +23,8 @@ interface LayoutHistorySnapshot {
   currentLayoutId: string | null;
 }
 
+type WallSide = 'left' | 'right' | 'top' | 'bottom';
+
 let nextFurnitureId = 1;
 
 function clamp(value: number, min: number, max: number) {
@@ -70,6 +72,60 @@ function clampPosition(roomValue: Room, item: Pick<PlacedFurniture, 'width' | 'h
   };
 }
 
+function getNearestWallSide(
+  roomValue: Room,
+  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation'>,
+  x: number,
+  y: number,
+): WallSide {
+  const footprint = getRotatedSize(item);
+  const maxX = Math.max(0, roomValue.width - footprint.width);
+  const maxY = Math.max(0, roomValue.height - footprint.height);
+  const clampedX = clamp(x, 0, maxX);
+  const clampedY = clamp(y, 0, maxY);
+  const distances: Array<{ side: WallSide; value: number }> = [
+    { side: 'left', value: clampedX },
+    { side: 'right', value: maxX - clampedX },
+    { side: 'top', value: clampedY },
+    { side: 'bottom', value: maxY - clampedY },
+  ];
+
+  return distances.reduce((nearest, current) => (current.value < nearest.value ? current : nearest)).side;
+}
+
+function getWallRotation(side: WallSide): Rotation {
+  return side === 'left' || side === 'right' ? 90 : 0;
+}
+
+function clampPositionToWall(
+  roomValue: Room,
+  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation'>,
+  x: number,
+  y: number,
+  side: WallSide,
+) {
+  const footprint = getRotatedSize(item);
+  const maxX = Math.max(0, roomValue.width - footprint.width);
+  const maxY = Math.max(0, roomValue.height - footprint.height);
+  let clampedX = clamp(x, 0, maxX);
+  let clampedY = clamp(y, 0, maxY);
+
+  if (side === 'left') {
+    clampedX = 0;
+  } else if (side === 'right') {
+    clampedX = maxX;
+  } else if (side === 'top') {
+    clampedY = 0;
+  } else {
+    clampedY = maxY;
+  }
+
+  return {
+    x: clampedX,
+    y: clampedY,
+  };
+}
+
 function normalizeFurnitureSize(value: number, maxValue: number) {
   return clamp(Math.round(value), MIN_FURNITURE_SIZE, maxValue);
 }
@@ -91,6 +147,21 @@ function applyFurnitureGeometry(
     width: nextWidth,
     height: nextHeight,
   };
+
+  if (nextItem.isWallAttached && (update.x !== undefined || update.y !== undefined)) {
+    const wallSide = getNearestWallSide(roomValue, nextItem, nextX, nextY);
+    const rotatedItem = {
+      ...nextItem,
+      rotation: getWallRotation(wallSide),
+    };
+    const position = clampPositionToWall(roomValue, rotatedItem, nextX, nextY, wallSide);
+
+    return {
+      ...rotatedItem,
+      ...position,
+    };
+  }
+
   const position = clampPosition(roomValue, nextItem, nextX, nextY);
 
   return {
@@ -111,6 +182,38 @@ function clampItemsToRoom(roomValue: Room, itemsValue: PlacedFurniture[]) {
     ...item,
     ...clampPosition(roomValue, item, item.x, item.y),
   }));
+}
+
+function getSwingBounds(item: PlacedFurniture): { x: number, y: number, width: number, height: number } | null {
+  if (item.templateId !== 'door' || !item.showDoorSwing || !item.doorHinge || !item.doorSwingDir) return null;
+  
+  const footprint = getRotatedSize(item);
+  const R = Math.max(item.width, item.height);
+  const isHorizontal = footprint.width > footprint.height;
+
+  let localX = 0;
+  let localY = 0;
+
+  if (isHorizontal) {
+    if (item.doorSwingDir === 'front') localY = -R;
+    else localY = footprint.height;
+
+    if (item.doorHinge === 'left') localX = 0;
+    else localX = footprint.width - R;
+  } else {
+    if (item.doorSwingDir === 'front') localX = -R;
+    else localX = footprint.width;
+
+    if (item.doorHinge === 'left') localY = 0;
+    else localY = footprint.height - R;
+  }
+
+  return {
+    x: item.x + localX,
+    y: item.y + localY,
+    width: R,
+    height: R,
+  };
 }
 
 function createFurnitureId() {
@@ -154,23 +257,39 @@ export function useRoomLayout() {
 
   const overlappingItemIds = useMemo(() => {
     const ids = new Set<string>();
-    const checkItems = items.filter((item) => !item.isWallAttached);
 
-    for (let i = 0; i < checkItems.length; i++) {
-      for (let j = i + 1; j < checkItems.length; j++) {
-        const a = checkItems[i];
-        const b = checkItems[j];
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i];
+        const b = items[j];
+
+        if (a.isWallAttached && b.isWallAttached) continue;
+
         const sizeA = getRotatedSize(a);
         const sizeB = getRotatedSize(b);
+        
+        const boundsA = { x: a.x, y: a.y, width: sizeA.width, height: sizeA.height };
+        const boundsB = { x: b.x, y: b.y, width: sizeB.width, height: sizeB.height };
 
-        const overlap = (
-          a.x < b.x + sizeB.width &&
-          a.x + sizeA.width > b.x &&
-          a.y < b.y + sizeB.height &&
-          a.y + sizeA.height > b.y
-        );
+        const checkOverlap = (b1: typeof boundsA, b2: typeof boundsA) => {
+          return b1.x < b2.x + b2.width &&
+                 b1.x + b1.width > b2.x &&
+                 b1.y < b2.y + b2.height &&
+                 b1.y + b1.height > b2.y;
+        };
 
-        if (overlap) {
+        const overlap = checkOverlap(boundsA, boundsB);
+        let swingOverlap = false;
+
+        if (!overlap) {
+          const swingA = getSwingBounds(a);
+          if (swingA && checkOverlap(swingA, boundsB)) swingOverlap = true;
+          
+          const swingB = getSwingBounds(b);
+          if (swingB && checkOverlap(swingB, boundsA)) swingOverlap = true;
+        }
+
+        if (overlap || swingOverlap) {
           ids.add(a.id);
           ids.add(b.id);
         }
@@ -312,22 +431,14 @@ export function useRoomLayout() {
     );
   };
 
-  const toggleDoorSwing = (id: string) => {
+  const updateDoorSwing = (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => {
     recordHistory();
     setItems((currentItems) =>
       currentItems.map((item) => {
         if (item.id !== id) return item;
-        
-        let nextSwing: 0 | 1 | 2 | 3 | null = null;
-        if (item.doorSwing == null) nextSwing = 0;
-        else if (item.doorSwing === 0) nextSwing = 1;
-        else if (item.doorSwing === 1) nextSwing = 2;
-        else if (item.doorSwing === 2) nextSwing = 3;
-        else if (item.doorSwing === 3) nextSwing = null;
-
         return {
           ...item,
-          doorSwing: nextSwing,
+          ...updates,
         };
       }),
     );
@@ -485,7 +596,7 @@ export function useRoomLayout() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
-    toggleDoorSwing,
+    updateDoorSwing,
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,

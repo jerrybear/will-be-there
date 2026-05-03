@@ -22,7 +22,7 @@ export default function App() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
-    toggleDoorSwing,
+    updateDoorSwing,
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,
@@ -71,7 +71,7 @@ export default function App() {
           snapSize={snapSize}
           savedLayouts={savedLayouts}
           onRotate={rotateFurniture}
-          onToggleDoorSwing={toggleDoorSwing}
+          onUpdateDoorSwing={updateDoorSwing}
           onDuplicate={duplicateFurniture}
           onDeleteFurniture={deleteFurniture}
           onUpdateFurniture={updateFurnitureGeometry}

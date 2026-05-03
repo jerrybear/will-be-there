@@ -20,7 +20,13 @@ interface DragState {
 
 export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSelect, onMoveStart, onMove }: RoomCanvasProps) {
   const roomRef = useRef<HTMLDivElement | null>(null);
+  const shellRef = useRef<HTMLDivElement | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isSpaceDown, setIsSpaceDown] = useState(false);
+  const panStartRef = useRef<{ clientX: number, clientY: number, panX: number, panY: number } | null>(null);
 
   useEffect(() => {
     if (!dragState) {
@@ -35,8 +41,8 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
       }
 
       const roomRect = roomElement.getBoundingClientRect();
-      const nextX = event.clientX - roomRect.left - dragState.pointerOffsetX;
-      const nextY = event.clientY - roomRect.top - dragState.pointerOffsetY;
+      const nextX = (event.clientX - roomRect.left) / zoom - dragState.pointerOffsetX;
+      const nextY = (event.clientY - roomRect.top) / zoom - dragState.pointerOffsetY;
 
       onMove(dragState.id, nextX, nextY);
     };
@@ -52,9 +58,92 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [dragState, onMove]);
+  }, [dragState, onMove, zoom]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpaceDown(true);
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpaceDown(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell) return;
+    
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        const zoomSensitivity = 0.002;
+        setZoom((prevZoom) => {
+          const newZoom = Math.max(0.1, Math.min(prevZoom - e.deltaY * zoomSensitivity, 5));
+          setPan((prevPan) => {
+            const rect = shell.getBoundingClientRect();
+            const cursorX = e.clientX - rect.left;
+            const cursorY = e.clientY - rect.top;
+            const localX = (cursorX - prevPan.x) / prevZoom;
+            const localY = (cursorY - prevPan.y) / prevZoom;
+            return {
+              x: cursorX - localX * newZoom,
+              y: cursorY - localY * newZoom,
+            };
+          });
+          return newZoom;
+        });
+      } else {
+        setPan((prev) => ({
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY,
+        }));
+      }
+    };
+    
+    shell.addEventListener('wheel', handleWheel, { passive: false });
+    return () => shell.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  const handleShellPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 1 || isSpaceDown) {
+      panStartRef.current = {
+        clientX: e.clientX,
+        clientY: e.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } else {
+      onSelect(null);
+    }
+  };
+
+  const handleShellPointerMove = (e: React.PointerEvent) => {
+    if (panStartRef.current) {
+      const dx = e.clientX - panStartRef.current.clientX;
+      const dy = e.clientY - panStartRef.current.clientY;
+      setPan({
+        x: panStartRef.current.panX + dx,
+        y: panStartRef.current.panY + dy,
+      });
+    }
+  };
+
+  const handleShellPointerUp = (e: React.PointerEvent) => {
+    if (panStartRef.current) {
+      panStartRef.current = null;
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
 
   const handleItemPointerDown = (event: React.PointerEvent<HTMLButtonElement>, item: PlacedFurniture) => {
+    if (event.button !== 0 || isSpaceDown) return;
     const roomElement = roomRef.current;
 
     if (!roomElement) {
@@ -69,8 +158,8 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
     const roomRect = roomElement.getBoundingClientRect();
     setDragState({
       id: item.id,
-      pointerOffsetX: event.clientX - roomRect.left - item.x,
-      pointerOffsetY: event.clientY - roomRect.top - item.y,
+      pointerOffsetX: (event.clientX - roomRect.left) / zoom - item.x,
+      pointerOffsetY: (event.clientY - roomRect.top) / zoom - item.y,
     });
   };
 
@@ -81,14 +170,26 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
         <p>가구를 클릭해서 선택하고 드래그로 위치를 옮겨보세요.</p>
       </div>
 
-      <div className="room-shell">
-        <div
-          ref={roomRef}
-          className="room-canvas"
-          style={{ width: room.width, height: room.height }}
-          onPointerDown={() => onSelect(null)}
+      <div className="room-shell-wrapper">
+        <div 
+          className={`room-shell ${isSpaceDown ? 'is-panning' : ''}`}
+          ref={shellRef}
+          onPointerDown={handleShellPointerDown}
+          onPointerMove={handleShellPointerMove}
+          onPointerUp={handleShellPointerUp}
+          style={{ cursor: isSpaceDown ? 'grab' : 'default' }}
         >
-          <div className="room-label">크기 조절 가능한 방</div>
+          <div
+            ref={roomRef}
+            className="room-canvas"
+            style={{ 
+              width: room.width, 
+              height: room.height,
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '0 0',
+            }}
+          >
+            <div className="room-label">크기 조절 가능한 방</div>
 
           {items.map((item) => {
             const footprint = getRotatedSize(item);
@@ -97,20 +198,26 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
             const isDoor = item.templateId === 'door';
 
             let swingStyle: React.CSSProperties | undefined;
-            if (isDoor && item.doorSwing != null) {
+            if (isDoor && item.showDoorSwing && item.doorHinge && item.doorSwingDir) {
               const R = Math.max(item.width, item.height);
               const isHorizontal = footprint.width > footprint.height;
               
               if (isHorizontal) {
-                 if (item.doorSwing === 0) swingStyle = { left: 0, top: -R, width: R, height: R, borderTopRightRadius: '100%', borderTop: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 1) swingStyle = { right: 0, top: -R, width: R, height: R, borderTopLeftRadius: '100%', borderTop: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 2) swingStyle = { left: 0, top: footprint.height, width: R, height: R, borderBottomRightRadius: '100%', borderBottom: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 3) swingStyle = { right: 0, top: footprint.height, width: R, height: R, borderBottomLeftRadius: '100%', borderBottom: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
+                if (item.doorSwingDir === 'front') {
+                  if (item.doorHinge === 'left') swingStyle = { left: 0, top: -R, width: R, height: R, borderTopRightRadius: '100%', borderTop: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
+                  else swingStyle = { right: 0, top: -R, width: R, height: R, borderTopLeftRadius: '100%', borderTop: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
+                } else {
+                  if (item.doorHinge === 'left') swingStyle = { left: 0, top: footprint.height, width: R, height: R, borderBottomRightRadius: '100%', borderBottom: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
+                  else swingStyle = { right: 0, top: footprint.height, width: R, height: R, borderBottomLeftRadius: '100%', borderBottom: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
+                }
               } else {
-                 if (item.doorSwing === 0) swingStyle = { left: -R, top: 0, width: R, height: R, borderBottomLeftRadius: '100%', borderBottom: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 1) swingStyle = { left: -R, bottom: 0, width: R, height: R, borderTopLeftRadius: '100%', borderTop: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 2) swingStyle = { left: footprint.width, top: 0, width: R, height: R, borderBottomRightRadius: '100%', borderBottom: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
-                 else if (item.doorSwing === 3) swingStyle = { left: footprint.width, bottom: 0, width: R, height: R, borderTopRightRadius: '100%', borderTop: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
+                if (item.doorSwingDir === 'front') {
+                  if (item.doorHinge === 'left') swingStyle = { left: -R, top: 0, width: R, height: R, borderBottomLeftRadius: '100%', borderBottom: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
+                  else swingStyle = { left: -R, bottom: 0, width: R, height: R, borderTopLeftRadius: '100%', borderTop: '1.5px solid #64748b', borderLeft: '1.5px solid #64748b' };
+                } else {
+                  if (item.doorHinge === 'left') swingStyle = { left: footprint.width, top: 0, width: R, height: R, borderBottomRightRadius: '100%', borderBottom: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
+                  else swingStyle = { left: footprint.width, bottom: 0, width: R, height: R, borderTopRightRadius: '100%', borderTop: '1.5px solid #64748b', borderRight: '1.5px solid #64748b' };
+                }
               }
             }
 
@@ -136,6 +243,13 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
             );
           })}
         </div>
+      </div>
+      </div>
+      <div className="zoom-controls">
+        <button type="button" onClick={() => setZoom(z => Math.max(0.1, z - 0.2))}>-</button>
+        <span>{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom(z => Math.min(5, z + 0.2))}>+</button>
+        <button type="button" onClick={() => { setZoom(1); setPan({x: 0, y: 0}); }}>초기화</button>
       </div>
     </section>
   );

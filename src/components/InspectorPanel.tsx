@@ -13,7 +13,7 @@ interface InspectorPanelProps {
   snapSize: SnapSize;
   savedLayouts: SavedLayout[];
   onRotate: (id: string) => void;
-  onToggleDoorSwing: (id: string) => void;
+  onUpdateDoorSwing: (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => void;
   onDuplicate: (id: string) => void;
   onDeleteFurniture: (id: string) => void;
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
@@ -47,7 +47,7 @@ export function InspectorPanel({
   snapSize,
   savedLayouts,
   onRotate,
-  onToggleDoorSwing,
+  onUpdateDoorSwing,
   onDuplicate,
   onDeleteFurniture,
   onUpdateFurniture,
@@ -375,11 +375,68 @@ export function InspectorPanel({
       <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
         90도 회전
       </button>
+      
       {item.templateId === 'door' && (
-        <button type="button" className="primary-button" style={{ marginTop: 8 }} onClick={() => onToggleDoorSwing(item.id)}>
-          🚪 열림 방향 변경
-        </button>
+        <div className="door-options-panel">
+          <label className="toggle-label">
+            <input
+              type="checkbox"
+              checked={!!item.showDoorSwing}
+              onChange={(e) => {
+                onUpdateDoorSwing(item.id, {
+                  showDoorSwing: e.target.checked,
+                  doorHinge: item.doorHinge || 'left',
+                  doorSwingDir: item.doorSwingDir || 'front',
+                });
+              }}
+            />
+            <span>스윙 영역 표시</span>
+          </label>
+          {item.showDoorSwing && (
+            <div className="door-swing-controls">
+              <div className="control-group">
+                <span>경첩</span>
+                <div className="segment-control">
+                  <button
+                    type="button"
+                    className={item.doorHinge === 'left' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
+                  >
+                    왼쪽
+                  </button>
+                  <button
+                    type="button"
+                    className={item.doorHinge === 'right' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
+                  >
+                    오른쪽
+                  </button>
+                </div>
+              </div>
+              <div className="control-group">
+                <span>방향</span>
+                <div className="segment-control">
+                  <button
+                    type="button"
+                    className={item.doorSwingDir === 'front' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'front' })}
+                  >
+                    앞쪽
+                  </button>
+                  <button
+                    type="button"
+                    className={item.doorSwingDir === 'back' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'back' })}
+                  >
+                    뒤쪽
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
+
       <div className="furniture-actions">
         <button type="button" className="ghost-button" onClick={() => onDuplicate(item.id)}>
           복제
