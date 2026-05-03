@@ -13,6 +13,7 @@ interface InspectorPanelProps {
   snapSize: SnapSize;
   savedLayouts: SavedLayout[];
   onRotate: (id: string) => void;
+  onRename: (id: string, label: string) => void;
   onUpdateDoorSwing: (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => void;
   onDuplicate: (id: string) => void;
   onDeleteFurniture: (id: string) => void;
@@ -21,6 +22,7 @@ interface InspectorPanelProps {
   onResizeRoom: (width: number, height: number) => void;
   onSave: (name: string, memo: string) => void;
   currentLayoutId: string | null;
+  hasUnsavedChanges: boolean;
   onUpdateCurrentLayout: () => void;
 }
 
@@ -47,6 +49,7 @@ export function InspectorPanel({
   snapSize,
   savedLayouts,
   onRotate,
+  onRename,
   onUpdateDoorSwing,
   onDuplicate,
   onDeleteFurniture,
@@ -55,6 +58,7 @@ export function InspectorPanel({
   onResizeRoom,
   onSave,
   currentLayoutId,
+  hasUnsavedChanges,
   onUpdateCurrentLayout,
 }: InspectorPanelProps) {
   const [layoutName, setLayoutName] = useState('');
@@ -69,6 +73,7 @@ export function InspectorPanel({
     width: '',
     height: '',
   });
+  const [labelDraft, setLabelDraft] = useState('');
 
   useEffect(() => {
     setRoomDraft({
@@ -85,6 +90,7 @@ export function InspectorPanel({
         width: '',
         height: '',
       });
+      setLabelDraft('');
       return;
     }
 
@@ -94,6 +100,7 @@ export function InspectorPanel({
       width: String(Math.round(item.width)),
       height: String(Math.round(item.height)),
     });
+    setLabelDraft(item.label);
   }, [item?.id, item?.x, item?.y, item?.width, item?.height]);
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
@@ -145,6 +152,16 @@ export function InspectorPanel({
     });
   };
 
+  const handleRename = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!item || !labelDraft.trim() || labelDraft.trim() === item.label) {
+      return;
+    }
+
+    onRename(item.id, labelDraft);
+  };
+
   const snapSection = (
     <div className="snap-editor">
       <h3>스냅</h3>
@@ -165,9 +182,12 @@ export function InspectorPanel({
     <div className="saved-layouts">
       {currentLayoutId && currentLayout ? (
         <div className="active-layout-section">
-          <h3>현재 작업 중: {currentLayout.name}</h3>
+          <h3>
+            현재 작업 중: {currentLayout.name}
+            {hasUnsavedChanges ? ' · 수정됨' : ''}
+          </h3>
           {currentLayout.memo && <p className="layout-memo">{currentLayout.memo}</p>}
-          <button type="button" className="primary-button update-button" onClick={onUpdateCurrentLayout}>
+          <button type="button" className="primary-button update-button" onClick={onUpdateCurrentLayout} disabled={!hasUnsavedChanges}>
             현재 도면에 덮어쓰기
           </button>
           
@@ -275,6 +295,22 @@ export function InspectorPanel({
   }
 
   const footprint = getRotatedSize(item);
+  const labelEditorSection = (
+    <form className="label-editor-form" onSubmit={handleRename}>
+      <label>
+        <span>이름</span>
+        <input
+          type="text"
+          value={labelDraft}
+          onChange={(event) => setLabelDraft(event.target.value)}
+          aria-label="선택 요소 이름"
+        />
+      </label>
+      <button type="submit" className="primary-button compact-button" disabled={!labelDraft.trim() || labelDraft.trim() === item.label}>
+        이름 변경
+      </button>
+    </form>
+  );
   const furnitureGeometrySection = (
     <form className="furniture-geometry-form" onSubmit={handleFurnitureApply}>
       <div className="dimension-fields">
@@ -339,6 +375,11 @@ export function InspectorPanel({
       </div>
 
       {snapSection}
+
+      <div className="label-editor">
+        <h3>이름</h3>
+        {labelEditorSection}
+      </div>
 
       <dl className="inspector-grid">
         <div>

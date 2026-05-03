@@ -240,6 +240,13 @@ function getNextFurnitureId(itemsValue: PlacedFurniture[]) {
   return maxId + 1;
 }
 
+function normalizeLayoutForComparison(roomValue: Room, itemsValue: PlacedFurniture[]) {
+  return JSON.stringify({
+    room: roomValue,
+    items: itemsValue,
+  });
+}
+
 export function useRoomLayout() {
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>([]);
@@ -254,6 +261,19 @@ export function useRoomLayout() {
     () => items.find((item) => item.id === selectedId) ?? null,
     [items, selectedId],
   );
+
+  const currentLayout = useMemo(
+    () => savedLayouts.find((layout) => layout.id === currentLayoutId) ?? null,
+    [currentLayoutId, savedLayouts],
+  );
+
+  const hasUnsavedChanges = useMemo(() => {
+    if (!currentLayout) {
+      return items.length > 0 || room.width !== DEFAULT_ROOM.width || room.height !== DEFAULT_ROOM.height;
+    }
+
+    return normalizeLayoutForComparison(room, items) !== normalizeLayoutForComparison(currentLayout.room, currentLayout.items);
+  }, [currentLayout, items, room]);
 
   const overlappingItemIds = useMemo(() => {
     const ids = new Set<string>();
@@ -406,6 +426,28 @@ export function useRoomLayout() {
         }
 
         return applyFurnitureGeometry(room, item, update, snapSize);
+      }),
+    );
+  };
+
+  const renameFurniture = (id: string, label: string) => {
+    const trimmedLabel = label.trim();
+
+    if (!trimmedLabel) {
+      return;
+    }
+
+    recordHistory();
+    setItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        return {
+          ...item,
+          label: trimmedLabel,
+        };
       }),
     );
   };
@@ -585,6 +627,8 @@ export function useRoomLayout() {
     items,
     selectedId,
     selectedItem,
+    currentLayout,
+    hasUnsavedChanges,
     overlappingItemIds,
     snapSize,
     savedLayouts,
@@ -595,6 +639,7 @@ export function useRoomLayout() {
     beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
+    renameFurniture,
     rotateFurniture,
     updateDoorSwing,
     duplicateFurniture,

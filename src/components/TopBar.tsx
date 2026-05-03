@@ -4,6 +4,7 @@ import type { SavedLayout } from '../types/layout';
 interface TopBarProps {
   savedLayouts: SavedLayout[];
   currentLayoutId: string | null;
+  hasUnsavedChanges: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onReset: () => void;
@@ -26,6 +27,7 @@ function formatSavedTime(value: string) {
 export function TopBar({
   savedLayouts,
   currentLayoutId,
+  hasUnsavedChanges,
   canUndo,
   canRedo,
   onReset,
@@ -120,7 +122,10 @@ export function TopBar({
                     return (
                       <article key={layout.id} className={`saved-layout-card ${layout.id === currentLayoutId ? 'is-active' : ''}`}>
                         <div className="layout-info">
-                          <strong>{layout.name}</strong>
+                          <strong>
+                            {layout.name}
+                            {layout.id === currentLayoutId && hasUnsavedChanges ? ' · 수정됨' : ''}
+                          </strong>
                           {layout.memo && <p className="layout-memo">{layout.memo}</p>}
                           <span>
                             {layout.items.length}개 가구 · {formatSavedTime(layout.updatedAt)}

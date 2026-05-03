@@ -490,6 +490,7 @@ button {
 }
 
 .snap-editor,
+.label-editor,
 .furniture-editor {
   display: grid;
   gap: 12px;
@@ -499,6 +500,7 @@ button {
 
 .room-size-editor h3,
 .snap-editor h3,
+.label-editor h3,
 .furniture-editor h3,
 .saved-layouts h3 {
   margin: 0;
@@ -519,6 +521,18 @@ button {
 .furniture-geometry-form {
   display: grid;
   gap: 10px;
+}
+
+.label-editor-form {
+  display: grid;
+  gap: 10px;
+}
+
+.label-editor-form label {
+  display: grid;
+  gap: 6px;
+  color: #5b6473;
+  font-size: 13px;
 }
 
 .furniture-actions {
@@ -549,6 +563,7 @@ button {
 }
 
 .dimension-fields input,
+.label-editor-form input,
 .snap-editor select,
 .save-form input,
 .memo-input,
@@ -564,6 +579,7 @@ button {
 }
 
 .dimension-fields input:focus,
+.label-editor-form input:focus,
 .snap-editor select:focus,
 .save-form input:focus,
 .memo-input:focus,

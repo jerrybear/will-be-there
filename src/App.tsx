@@ -11,6 +11,8 @@ export default function App() {
     items,
     selectedId,
     selectedItem,
+    currentLayout,
+    hasUnsavedChanges,
     overlappingItemIds,
     snapSize,
     savedLayouts,
@@ -21,6 +23,7 @@ export default function App() {
     beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
+    renameFurniture,
     rotateFurniture,
     updateDoorSwing,
     duplicateFurniture,
@@ -32,7 +35,6 @@ export default function App() {
     loadLayout,
     deleteLayout,
     updateLayoutMeta,
-    currentLayoutId,
     updateCurrentLayout,
     undoLayoutChange,
     redoLayoutChange,
@@ -42,7 +44,8 @@ export default function App() {
     <div className="app-shell">
       <TopBar
         savedLayouts={savedLayouts}
-        currentLayoutId={currentLayoutId}
+        currentLayoutId={currentLayout?.id ?? null}
+        hasUnsavedChanges={hasUnsavedChanges}
         canUndo={canUndo}
         canRedo={canRedo}
         onReset={resetLayout}
@@ -71,6 +74,7 @@ export default function App() {
           snapSize={snapSize}
           savedLayouts={savedLayouts}
           onRotate={rotateFurniture}
+          onRename={renameFurniture}
           onUpdateDoorSwing={updateDoorSwing}
           onDuplicate={duplicateFurniture}
           onDeleteFurniture={deleteFurniture}
@@ -78,7 +82,8 @@ export default function App() {
           onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}
           onSave={saveLayout}
-          currentLayoutId={currentLayoutId}
+          currentLayoutId={currentLayout?.id ?? null}
+          hasUnsavedChanges={hasUnsavedChanges}
           onUpdateCurrentLayout={updateCurrentLayout}
         />
       </main>
