@@ -389,6 +389,13 @@ button {
   gap: 10px;
 }
 
+.furniture-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 18px 18px;
+}
+
 .dimension-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;

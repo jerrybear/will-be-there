@@ -12,6 +12,8 @@ interface InspectorPanelProps {
   snapSize: SnapSize;
   savedLayouts: SavedLayout[];
   onRotate: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onDeleteFurniture: (id: string) => void;
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
   onSnapSizeChange: (snapSize: SnapSize) => void;
   onResizeRoom: (width: number, height: number) => void;
@@ -42,6 +44,8 @@ export function InspectorPanel({
   snapSize,
   savedLayouts,
   onRotate,
+  onDuplicate,
+  onDeleteFurniture,
   onUpdateFurniture,
   onSnapSizeChange,
   onResizeRoom,
@@ -361,6 +365,14 @@ export function InspectorPanel({
       <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
         90도 회전
       </button>
+      <div className="furniture-actions">
+        <button type="button" className="ghost-button" onClick={() => onDuplicate(item.id)}>
+          복제
+        </button>
+        <button type="button" className="ghost-button danger-button" onClick={() => onDeleteFurniture(item.id)}>
+          삭제
+        </button>
+      </div>
       {roomSizeSection}
       {savedLayoutsSection}
     </section>

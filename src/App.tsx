@@ -18,6 +18,8 @@ export default function App() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
+    duplicateFurniture,
+    deleteFurniture,
     setSnapSize,
     resetLayout,
     resizeRoom,
@@ -55,6 +57,8 @@ export default function App() {
           snapSize={snapSize}
           savedLayouts={savedLayouts}
           onRotate={rotateFurniture}
+          onDuplicate={duplicateFurniture}
+          onDeleteFurniture={deleteFurniture}
           onUpdateFurniture={updateFurnitureGeometry}
           onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}

@@ -216,6 +216,30 @@ export function useRoomLayout() {
     );
   };
 
+  const duplicateFurniture = (id: string) => {
+    const item = items.find((currentItem) => currentItem.id === id);
+
+    if (!item) {
+      return;
+    }
+
+    const draftItem: PlacedFurniture = {
+      ...item,
+      id: createFurnitureId(),
+      x: item.x + 28,
+      y: item.y + 28,
+    };
+    const nextItem = applyFurnitureGeometry(room, draftItem, { x: draftItem.x, y: draftItem.y }, snapSize);
+
+    setItems((currentItems) => [...currentItems, nextItem]);
+    setSelectedId(nextItem.id);
+  };
+
+  const deleteFurniture = (id: string) => {
+    setItems((currentItems) => currentItems.filter((item) => item.id !== id));
+    setSelectedId((currentSelectedId) => (currentSelectedId === id ? null : currentSelectedId));
+  };
+
   const resetLayout = () => {
     setRoom(DEFAULT_ROOM);
     setItems([]);
@@ -330,6 +354,8 @@ export function useRoomLayout() {
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
+    duplicateFurniture,
+    deleteFurniture,
     setSnapSize,
     resetLayout,
     resizeRoom,
