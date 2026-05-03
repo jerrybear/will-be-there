@@ -14,6 +14,14 @@ const MIN_ROOM_HEIGHT = 180;
 const MAX_ROOM_WIDTH = 1200;
 const MAX_ROOM_HEIGHT = 900;
 const MIN_FURNITURE_SIZE = 20;
+const MAX_HISTORY_LENGTH = 80;
+
+interface LayoutHistorySnapshot {
+  room: Room;
+  items: PlacedFurniture[];
+  selectedId: string | null;
+  currentLayoutId: string | null;
+}
 
 let nextFurnitureId = 1;
 
@@ -136,11 +144,62 @@ export function useRoomLayout() {
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => loadSavedLayouts());
   const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
+  const [pastLayouts, setPastLayouts] = useState<LayoutHistorySnapshot[]>([]);
+  const [futureLayouts, setFutureLayouts] = useState<LayoutHistorySnapshot[]>([]);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
     [items, selectedId],
   );
+
+  const createLayoutSnapshot = (): LayoutHistorySnapshot => ({
+    room,
+    items,
+    selectedId,
+    currentLayoutId,
+  });
+
+  const restoreLayoutSnapshot = (snapshot: LayoutHistorySnapshot) => {
+    nextFurnitureId = getNextFurnitureId(snapshot.items);
+    setRoom(snapshot.room);
+    setItems(snapshot.items);
+    setSelectedId(snapshot.selectedId);
+    setCurrentLayoutId(snapshot.currentLayoutId);
+  };
+
+  const recordHistory = () => {
+    const snapshot = createLayoutSnapshot();
+    setPastLayouts((currentPastLayouts) => [...currentPastLayouts.slice(-(MAX_HISTORY_LENGTH - 1)), snapshot]);
+    setFutureLayouts([]);
+  };
+
+  const undoLayoutChange = () => {
+    setPastLayouts((currentPastLayouts) => {
+      const previousSnapshot = currentPastLayouts[currentPastLayouts.length - 1];
+
+      if (!previousSnapshot) {
+        return currentPastLayouts;
+      }
+
+      setFutureLayouts((currentFutureLayouts) => [createLayoutSnapshot(), ...currentFutureLayouts.slice(0, MAX_HISTORY_LENGTH - 1)]);
+      restoreLayoutSnapshot(previousSnapshot);
+      return currentPastLayouts.slice(0, -1);
+    });
+  };
+
+  const redoLayoutChange = () => {
+    setFutureLayouts((currentFutureLayouts) => {
+      const nextSnapshot = currentFutureLayouts[0];
+
+      if (!nextSnapshot) {
+        return currentFutureLayouts;
+      }
+
+      setPastLayouts((currentPastLayouts) => [...currentPastLayouts.slice(-(MAX_HISTORY_LENGTH - 1)), createLayoutSnapshot()]);
+      restoreLayoutSnapshot(nextSnapshot);
+      return currentFutureLayouts.slice(1);
+    });
+  };
 
   const addFurniture = (templateId: string) => {
     const template = furnitureCatalog.find((item) => item.id === templateId);
@@ -148,6 +207,8 @@ export function useRoomLayout() {
     if (!template) {
       return;
     }
+
+    recordHistory();
 
     const offset = items.length % 6;
     const draftItem: PlacedFurniture = {
@@ -173,6 +234,10 @@ export function useRoomLayout() {
     setSelectedId(id);
   };
 
+  const beginFurnitureMove = () => {
+    recordHistory();
+  };
+
   const moveFurniture = (id: string, x: number, y: number) => {
     setItems((currentItems) =>
       currentItems.map((item) => {
@@ -186,6 +251,8 @@ export function useRoomLayout() {
   };
 
   const updateFurnitureGeometry = (id: string, update: FurnitureGeometryUpdate) => {
+    recordHistory();
+
     setItems((currentItems) =>
       currentItems.map((item) => {
         if (item.id !== id) {
@@ -198,6 +265,8 @@ export function useRoomLayout() {
   };
 
   const rotateFurniture = (id: string) => {
+    recordHistory();
+
     setItems((currentItems) =>
       currentItems.map((item) => {
         if (item.id !== id) {
@@ -223,6 +292,8 @@ export function useRoomLayout() {
       return;
     }
 
+    recordHistory();
+
     const draftItem: PlacedFurniture = {
       ...item,
       id: createFurnitureId(),
@@ -236,11 +307,15 @@ export function useRoomLayout() {
   };
 
   const deleteFurniture = (id: string) => {
+    recordHistory();
+
     setItems((currentItems) => currentItems.filter((item) => item.id !== id));
     setSelectedId((currentSelectedId) => (currentSelectedId === id ? null : currentSelectedId));
   };
 
   const resetLayout = () => {
+    recordHistory();
+
     setRoom(DEFAULT_ROOM);
     setItems([]);
     setSelectedId(null);
@@ -249,6 +324,8 @@ export function useRoomLayout() {
 
   const resizeRoom = (width: number, height: number) => {
     const nextRoom = normalizeRoomSize(width, height);
+    recordHistory();
+
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
   };
@@ -284,6 +361,8 @@ export function useRoomLayout() {
     if (!layout) {
       return;
     }
+
+    recordHistory();
 
     nextFurnitureId = getNextFurnitureId(layout.items);
     setRoom(layout.room);
@@ -349,8 +428,11 @@ export function useRoomLayout() {
     selectedItem,
     snapSize,
     savedLayouts,
+    canUndo: pastLayouts.length > 0,
+    canRedo: futureLayouts.length > 0,
     addFurniture,
     selectFurniture,
+    beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
@@ -365,5 +447,7 @@ export function useRoomLayout() {
     updateLayoutMeta,
     currentLayoutId,
     updateCurrentLayout,
+    undoLayoutChange,
+    redoLayoutChange,
   };
 }

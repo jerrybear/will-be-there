@@ -4,7 +4,11 @@ import type { SavedLayout } from '../types/layout';
 interface TopBarProps {
   savedLayouts: SavedLayout[];
   currentLayoutId: string | null;
+  canUndo: boolean;
+  canRedo: boolean;
   onReset: () => void;
+  onUndo: () => void;
+  onRedo: () => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateMeta: (id: string, name: string, memo: string) => void;
@@ -22,7 +26,11 @@ function formatSavedTime(value: string) {
 export function TopBar({
   savedLayouts,
   currentLayoutId,
+  canUndo,
+  canRedo,
   onReset,
+  onUndo,
+  onRedo,
   onLoad,
   onDelete,
   onUpdateMeta,
@@ -57,6 +65,14 @@ export function TopBar({
         <p>옮기기 전에, 여기 한번 놔보기</p>
       </div>
       <div className="top-bar-actions">
+        <div className="history-actions">
+          <button type="button" className="ghost-button compact-button" onClick={onUndo} disabled={!canUndo}>
+            Undo
+          </button>
+          <button type="button" className="ghost-button compact-button" onClick={onRedo} disabled={!canRedo}>
+            Redo
+          </button>
+        </div>
         <div className="saved-layouts-dropdown">
           <button type="button" className="ghost-button" onClick={() => setIsOpen(!isOpen)}>
             저장된 배치안 ▼

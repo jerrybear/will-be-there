@@ -51,6 +51,11 @@ button {
   align-items: center;
 }
 
+.history-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .saved-layouts-dropdown {
   position: relative;
 }
@@ -292,7 +297,8 @@ button {
   color: #ffffff;
 }
 
-.primary-button:disabled {
+.primary-button:disabled,
+.ghost-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
@@ -311,8 +317,8 @@ button {
   color: #b42318;
 }
 
-.primary-button:hover,
-.ghost-button:hover {
+.primary-button:not(:disabled):hover,
+.ghost-button:not(:disabled):hover {
   opacity: 0.92;
 }
 

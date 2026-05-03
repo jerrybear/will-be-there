@@ -7,6 +7,7 @@ interface RoomCanvasProps {
   items: PlacedFurniture[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  onMoveStart: () => void;
   onMove: (id: string, x: number, y: number) => void;
 }
 
@@ -16,7 +17,7 @@ interface DragState {
   pointerOffsetY: number;
 }
 
-export function RoomCanvas({ room, items, selectedId, onSelect, onMove }: RoomCanvasProps) {
+export function RoomCanvas({ room, items, selectedId, onSelect, onMoveStart, onMove }: RoomCanvasProps) {
   const roomRef = useRef<HTMLDivElement | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
 
@@ -62,6 +63,7 @@ export function RoomCanvas({ room, items, selectedId, onSelect, onMove }: RoomCa
     event.preventDefault();
     event.stopPropagation();
     onSelect(item.id);
+    onMoveStart();
 
     const roomRect = roomElement.getBoundingClientRect();
     setDragState({

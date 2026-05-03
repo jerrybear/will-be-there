@@ -13,8 +13,11 @@ export default function App() {
     selectedItem,
     snapSize,
     savedLayouts,
+    canUndo,
+    canRedo,
     addFurniture,
     selectFurniture,
+    beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
     rotateFurniture,
@@ -29,6 +32,8 @@ export default function App() {
     updateLayoutMeta,
     currentLayoutId,
     updateCurrentLayout,
+    undoLayoutChange,
+    redoLayoutChange,
   } = useRoomLayout();
 
   return (
@@ -36,7 +41,11 @@ export default function App() {
       <TopBar
         savedLayouts={savedLayouts}
         currentLayoutId={currentLayoutId}
+        canUndo={canUndo}
+        canRedo={canRedo}
         onReset={resetLayout}
+        onUndo={undoLayoutChange}
+        onRedo={redoLayoutChange}
         onLoad={loadLayout}
         onDelete={deleteLayout}
         onUpdateMeta={updateLayoutMeta}
@@ -49,6 +58,7 @@ export default function App() {
           items={items}
           selectedId={selectedId}
           onSelect={selectFurniture}
+          onMoveStart={beginFurnitureMove}
           onMove={moveFurniture}
         />
         <InspectorPanel
