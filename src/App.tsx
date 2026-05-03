@@ -11,11 +11,14 @@ export default function App() {
     items,
     selectedId,
     selectedItem,
+    snapSize,
     savedLayouts,
     addFurniture,
     selectFurniture,
     moveFurniture,
+    updateFurnitureGeometry,
     rotateFurniture,
+    setSnapSize,
     resetLayout,
     resizeRoom,
     saveLayout,
@@ -39,8 +42,11 @@ export default function App() {
         <InspectorPanel
           room={room}
           item={selectedItem}
+          snapSize={snapSize}
           savedLayouts={savedLayouts}
           onRotate={rotateFurniture}
+          onUpdateFurniture={updateFurnitureGeometry}
+          onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}
           onSave={saveLayout}
           onLoad={loadLayout}

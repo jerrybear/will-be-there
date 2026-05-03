@@ -1,4 +1,5 @@
 export type Rotation = 0 | 90;
+export type SnapSize = 0 | 10 | 24;
 
 export interface Size {
   width: number;
@@ -25,6 +26,8 @@ export interface PlacedFurniture extends Size, Position {
   color: string;
   rotation: Rotation;
 }
+
+export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {}
 
 export interface SavedLayout {
   id: string;

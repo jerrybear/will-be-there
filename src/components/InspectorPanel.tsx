@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { PlacedFurniture } from '../types/layout';
+import type { FurnitureGeometryUpdate, PlacedFurniture } from '../types/layout';
 import type { Room } from '../types/layout';
 import type { SavedLayout } from '../types/layout';
+import type { SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
 
 interface InspectorPanelProps {
   room: Room;
   item: PlacedFurniture | null;
+  snapSize: SnapSize;
   savedLayouts: SavedLayout[];
   onRotate: (id: string) => void;
+  onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
+  onSnapSizeChange: (snapSize: SnapSize) => void;
   onResizeRoom: (width: number, height: number) => void;
   onSave: (name: string) => void;
   onLoad: (id: string) => void;
@@ -25,11 +29,36 @@ function formatSavedTime(value: string) {
   }).format(new Date(value));
 }
 
-export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoom, onSave, onLoad, onDelete }: InspectorPanelProps) {
+function hasValidNumberDraft(values: string[]) {
+  return values.every((value) => {
+    const parsedValue = Number(value);
+    return Number.isFinite(parsedValue) && parsedValue >= 0;
+  });
+}
+
+export function InspectorPanel({
+  room,
+  item,
+  snapSize,
+  savedLayouts,
+  onRotate,
+  onUpdateFurniture,
+  onSnapSizeChange,
+  onResizeRoom,
+  onSave,
+  onLoad,
+  onDelete,
+}: InspectorPanelProps) {
   const [layoutName, setLayoutName] = useState('');
   const [roomDraft, setRoomDraft] = useState({
     width: String(room.width),
     height: String(room.height),
+  });
+  const [furnitureDraft, setFurnitureDraft] = useState({
+    x: '',
+    y: '',
+    width: '',
+    height: '',
   });
 
   useEffect(() => {
@@ -38,6 +67,25 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
       height: String(room.height),
     });
   }, [room.width, room.height]);
+
+  useEffect(() => {
+    if (!item) {
+      setFurnitureDraft({
+        x: '',
+        y: '',
+        width: '',
+        height: '',
+      });
+      return;
+    }
+
+    setFurnitureDraft({
+      x: String(Math.round(item.x)),
+      y: String(Math.round(item.y)),
+      width: String(Math.round(item.width)),
+      height: String(Math.round(item.height)),
+    });
+  }, [item?.id, item?.x, item?.y, item?.width, item?.height]);
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -49,6 +97,18 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
   const draftHeight = Number(roomDraft.height);
   const hasValidRoomDraft = Number.isFinite(draftWidth) && Number.isFinite(draftHeight) && draftWidth > 0 && draftHeight > 0;
   const hasRoomChanges = draftWidth !== room.width || draftHeight !== room.height;
+  const hasValidFurnitureDraft = hasValidNumberDraft([
+    furnitureDraft.x,
+    furnitureDraft.y,
+    furnitureDraft.width,
+    furnitureDraft.height,
+  ]) && Number(furnitureDraft.width) > 0 && Number(furnitureDraft.height) > 0;
+  const hasFurnitureChanges = !!item && (
+    Number(furnitureDraft.x) !== Math.round(item.x) ||
+    Number(furnitureDraft.y) !== Math.round(item.y) ||
+    Number(furnitureDraft.width) !== Math.round(item.width) ||
+    Number(furnitureDraft.height) !== Math.round(item.height)
+  );
 
   const handleRoomSizeApply = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -59,6 +119,35 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
 
     onResizeRoom(draftWidth, draftHeight);
   };
+
+  const handleFurnitureApply = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!item || !hasValidFurnitureDraft) {
+      return;
+    }
+
+    onUpdateFurniture(item.id, {
+      x: Number(furnitureDraft.x),
+      y: Number(furnitureDraft.y),
+      width: Number(furnitureDraft.width),
+      height: Number(furnitureDraft.height),
+    });
+  };
+
+  const snapSection = (
+    <div className="snap-editor">
+      <h3>스냅</h3>
+      <label>
+        <span>이동/입력 단위</span>
+        <select value={snapSize} onChange={(event) => onSnapSizeChange(Number(event.target.value) as SnapSize)}>
+          <option value={0}>없음</option>
+          <option value={10}>10px</option>
+          <option value={24}>24px 그리드</option>
+        </select>
+      </label>
+    </div>
+  );
 
   const savedLayoutsSection = (
     <div className="saved-layouts">
@@ -146,6 +235,7 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
           <h2>선택 가구</h2>
           <p>방 안의 가구를 클릭하면 상세 정보가 보입니다.</p>
         </div>
+        {snapSection}
         {roomSizeSection}
         <div className="empty-state">아직 선택된 가구가 없습니다.</div>
         {savedLayoutsSection}
@@ -154,6 +244,55 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
   }
 
   const footprint = getRotatedSize(item);
+  const furnitureGeometrySection = (
+    <form className="furniture-geometry-form" onSubmit={handleFurnitureApply}>
+      <div className="dimension-fields">
+        <label>
+          <span>x</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={furnitureDraft.x}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, x: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>y</span>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={furnitureDraft.y}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, y: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>폭</span>
+          <input
+            type="number"
+            min="20"
+            step="1"
+            value={furnitureDraft.width}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, width: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>높이</span>
+          <input
+            type="number"
+            min="20"
+            step="1"
+            value={furnitureDraft.height}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, height: event.target.value }))}
+          />
+        </label>
+      </div>
+      <button type="submit" className="primary-button compact-button" disabled={!hasValidFurnitureDraft || !hasFurnitureChanges}>
+        적용
+      </button>
+    </form>
+  );
 
   return (
     <section className="panel inspector-panel">
@@ -161,6 +300,8 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
         <h2>{item.label}</h2>
         <p>현재 선택된 가구의 배치 정보입니다.</p>
       </div>
+
+      {snapSection}
 
       <dl className="inspector-grid">
         <div>
@@ -188,6 +329,11 @@ export function InspectorPanel({ room, item, savedLayouts, onRotate, onResizeRoo
           <dd>{item.rotation}°</dd>
         </div>
       </dl>
+
+      <div className="furniture-editor">
+        <h3>위치/크기</h3>
+        {furnitureGeometrySection}
+      </div>
 
       <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
         90도 회전
