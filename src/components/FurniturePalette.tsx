@@ -22,7 +22,10 @@ export function FurniturePalette({ items, onAdd }: FurniturePaletteProps) {
             onClick={() => onAdd(item.id)}
           >
             <span className="palette-swatch" style={{ backgroundColor: item.color }} />
-            <span className="palette-name">{item.label}</span>
+            <span className="palette-name">
+              {item.label}
+              {item.isWallAttached && <span className="wall-badge">벽 부착</span>}
+            </span>
             <span className="palette-size">
               {item.width} × {item.height}
             </span>

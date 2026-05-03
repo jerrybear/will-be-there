@@ -2,6 +2,22 @@ import type { FurnitureTemplate } from '../types/layout';
 
 export const furnitureCatalog: FurnitureTemplate[] = [
   {
+    id: 'door',
+    label: '문',
+    width: 80,
+    height: 24,
+    color: '#cbd5e1',
+    isWallAttached: true,
+  },
+  {
+    id: 'window',
+    label: '창문',
+    width: 120,
+    height: 24,
+    color: '#bae6fd',
+    isWallAttached: true,
+  },
+  {
     id: 'bed',
     label: '침대',
     width: 180,

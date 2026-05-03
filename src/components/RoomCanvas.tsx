@@ -85,7 +85,7 @@ export function RoomCanvas({ room, items, selectedId, onSelect, onMove }: RoomCa
           style={{ width: room.width, height: room.height }}
           onPointerDown={() => onSelect(null)}
         >
-          <div className="room-label">고정된 직사각형 방</div>
+          <div className="room-label">크기 조절 가능한 방</div>
 
           {items.map((item) => {
             const footprint = getRotatedSize(item);
@@ -94,7 +94,7 @@ export function RoomCanvas({ room, items, selectedId, onSelect, onMove }: RoomCa
               <button
                 key={item.id}
                 type="button"
-                className={`furniture-item ${selectedId === item.id ? 'is-selected' : ''}`}
+                className={`furniture-item ${selectedId === item.id ? 'is-selected' : ''} ${item.isWallAttached ? 'is-wall-attached' : ''}`}
                 style={{
                   left: item.x,
                   top: item.y,

@@ -15,9 +15,9 @@ interface InspectorPanelProps {
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
   onSnapSizeChange: (snapSize: SnapSize) => void;
   onResizeRoom: (width: number, height: number) => void;
-  onSave: (name: string) => void;
-  onLoad: (id: string) => void;
-  onDelete: (id: string) => void;
+  onSave: (name: string, memo: string) => void;
+  currentLayoutId: string | null;
+  onUpdateCurrentLayout: () => void;
 }
 
 function formatSavedTime(value: string) {
@@ -46,10 +46,11 @@ export function InspectorPanel({
   onSnapSizeChange,
   onResizeRoom,
   onSave,
-  onLoad,
-  onDelete,
+  currentLayoutId,
+  onUpdateCurrentLayout,
 }: InspectorPanelProps) {
   const [layoutName, setLayoutName] = useState('');
+  const [layoutMemo, setLayoutMemo] = useState('');
   const [roomDraft, setRoomDraft] = useState({
     width: String(room.width),
     height: String(room.height),
@@ -89,8 +90,9 @@ export function InspectorPanel({
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSave(layoutName);
+    onSave(layoutName, layoutMemo);
     setLayoutName('');
+    setLayoutMemo('');
   };
 
   const draftWidth = Number(roomDraft.width);
@@ -149,44 +151,65 @@ export function InspectorPanel({
     </div>
   );
 
+  const currentLayout = savedLayouts.find((l) => l.id === currentLayoutId);
+
   const savedLayoutsSection = (
     <div className="saved-layouts">
-      <h3>저장안</h3>
-      <form className="save-form" onSubmit={handleSave}>
-        <input
-          type="text"
-          value={layoutName}
-          onChange={(event) => setLayoutName(event.target.value)}
-          placeholder="예: 침실 배치 1"
-          aria-label="저장안 이름"
-        />
-        <button type="submit" className="primary-button compact-button" disabled={!layoutName.trim()}>
-          저장
-        </button>
-      </form>
-
-      {savedLayouts.length === 0 ? (
-        <div className="empty-state compact-empty">저장된 배치안이 없습니다.</div>
+      {currentLayoutId && currentLayout ? (
+        <div className="active-layout-section">
+          <h3>현재 작업 중: {currentLayout.name}</h3>
+          {currentLayout.memo && <p className="layout-memo">{currentLayout.memo}</p>}
+          <button type="button" className="primary-button update-button" onClick={onUpdateCurrentLayout}>
+            현재 도면에 덮어쓰기
+          </button>
+          
+          <hr className="section-divider" />
+          
+          <h3>새로운 도면으로 복사</h3>
+          <form className="save-form" onSubmit={handleSave}>
+            <input
+              type="text"
+              value={layoutName}
+              onChange={(event) => setLayoutName(event.target.value)}
+              placeholder="새 도면 이름"
+              aria-label="새 도면 이름"
+            />
+            <textarea
+              value={layoutMemo}
+              onChange={(event) => setLayoutMemo(event.target.value)}
+              placeholder="새 메모 (선택 사항)"
+              aria-label="새 도면 메모"
+              rows={2}
+              className="memo-input"
+            />
+            <button type="submit" className="ghost-button compact-button" disabled={!layoutName.trim()}>
+              복사로 저장
+            </button>
+          </form>
+        </div>
       ) : (
-        <div className="saved-layout-list">
-          {savedLayouts.map((layout) => (
-            <article key={layout.id} className="saved-layout-card">
-              <div>
-                <strong>{layout.name}</strong>
-                <span>
-                  {layout.items.length}개 가구 · {formatSavedTime(layout.updatedAt)}
-                </span>
-              </div>
-              <div className="saved-layout-actions">
-                <button type="button" className="ghost-button compact-button" onClick={() => onLoad(layout.id)}>
-                  불러오기
-                </button>
-                <button type="button" className="ghost-button compact-button danger-button" onClick={() => onDelete(layout.id)}>
-                  삭제
-                </button>
-              </div>
-            </article>
-          ))}
+        <div className="new-layout-section">
+          <h3>새 도면 저장</h3>
+          <form className="save-form" onSubmit={handleSave}>
+            <input
+              type="text"
+              value={layoutName}
+              onChange={(event) => setLayoutName(event.target.value)}
+              placeholder="저장안 이름 (예: 침실 배치 1)"
+              aria-label="저장안 이름"
+            />
+            <textarea
+              value={layoutMemo}
+              onChange={(event) => setLayoutMemo(event.target.value)}
+              placeholder="간단한 메모 (선택 사항)"
+              aria-label="저장안 메모"
+              rows={2}
+              className="memo-input"
+            />
+            <button type="submit" className="primary-button compact-button save-button" disabled={!layoutName.trim()}>
+              저장
+            </button>
+          </form>
         </div>
       )}
     </div>

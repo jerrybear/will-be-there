@@ -45,6 +45,31 @@ button {
   color: #5b6473;
 }
 
+.top-bar-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.saved-layouts-dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  max-height: 480px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #d9deea;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.15);
+  padding: 12px;
+  z-index: 100;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr) 280px;
@@ -114,6 +139,18 @@ button {
 
 .palette-name {
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wall-badge {
+  font-size: 10px;
+  background: #e2e8f0;
+  color: #475569;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
 }
 
 .palette-size {
@@ -134,7 +171,7 @@ button {
   position: relative;
   overflow: hidden;
   border: 2px solid #cfd7e6;
-  border-radius: 20px;
+  border-radius: 0;
   background:
     linear-gradient(90deg, rgba(177, 188, 214, 0.12) 1px, transparent 1px),
     linear-gradient(rgba(177, 188, 214, 0.12) 1px, transparent 1px),
@@ -166,6 +203,24 @@ button {
   cursor: grab;
   touch-action: none;
   user-select: none;
+  overflow: hidden;
+}
+
+.furniture-item.is-wall-attached {
+  padding: 4px;
+  border-radius: 2px;
+  justify-content: center;
+  align-items: center;
+  flex-direction: row;
+}
+
+.furniture-item.is-wall-attached span:first-child {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.furniture-item.is-wall-attached .furniture-rotation {
+  display: none;
 }
 
 .furniture-item:active {
@@ -268,6 +323,33 @@ button {
   border-top: 1px solid #e9edf5;
 }
 
+.saved-layouts-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.section-divider {
+  border: none;
+  border-top: 2px dashed #cfd7e6;
+  margin: 16px 0;
+}
+
+.update-button {
+  width: 100%;
+  margin: 8px 0 0 0;
+  padding: 14px;
+}
+
+.active-badge {
+  padding: 4px 8px;
+  background: #e0e7ff;
+  color: #3730a3;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .room-size-editor {
   display: grid;
   gap: 12px;
@@ -329,7 +411,10 @@ button {
 
 .dimension-fields input,
 .snap-editor select,
-.save-form input {
+.save-form input,
+.memo-input,
+.edit-fields input,
+.edit-fields textarea {
   min-width: 0;
   padding: 9px 10px;
   border: 1px solid #cfd7e6;
@@ -341,9 +426,44 @@ button {
 
 .dimension-fields input:focus,
 .snap-editor select:focus,
-.save-form input:focus {
+.save-form input:focus,
+.memo-input:focus,
+.edit-fields input:focus,
+.edit-fields textarea:focus {
   outline: 2px solid rgba(124, 156, 245, 0.32);
   border-color: #7c9cf5;
+}
+
+.save-form .memo-input {
+  grid-column: 1 / -1;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.save-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.edit-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.edit-fields .memo-input {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.layout-info .layout-memo {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 .compact-empty {
@@ -374,6 +494,15 @@ button {
   margin-top: 3px;
   color: #5b6473;
   font-size: 13px;
+}
+
+.saved-layout-card.editing {
+  border-color: #7c9cf5;
+  background: #f3f7ff;
+}
+
+.saved-layout-card.is-active {
+  border: 2px solid #7c9cf5;
 }
 
 .saved-layout-actions {

@@ -24,11 +24,21 @@ export default function App() {
     saveLayout,
     loadLayout,
     deleteLayout,
+    updateLayoutMeta,
+    currentLayoutId,
+    updateCurrentLayout,
   } = useRoomLayout();
 
   return (
     <div className="app-shell">
-      <TopBar onReset={resetLayout} />
+      <TopBar
+        savedLayouts={savedLayouts}
+        currentLayoutId={currentLayoutId}
+        onReset={resetLayout}
+        onLoad={loadLayout}
+        onDelete={deleteLayout}
+        onUpdateMeta={updateLayoutMeta}
+      />
 
       <main className="workspace-grid">
         <FurniturePalette items={catalog} onAdd={addFurniture} />
@@ -49,8 +59,8 @@ export default function App() {
           onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}
           onSave={saveLayout}
-          onLoad={loadLayout}
-          onDelete={deleteLayout}
+          currentLayoutId={currentLayoutId}
+          onUpdateCurrentLayout={updateCurrentLayout}
         />
       </main>
     </div>

@@ -41,7 +41,11 @@ export function loadSavedLayouts(): SavedLayout[] {
       return [];
     }
 
-    return parsedValue.filter(isSavedLayout);
+    const filtered = parsedValue.filter(isSavedLayout);
+    return filtered.map((layout) => ({
+      ...layout,
+      memo: layout.memo ?? '',
+    }));
   } catch {
     return [];
   }

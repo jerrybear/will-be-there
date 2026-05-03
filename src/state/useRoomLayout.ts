@@ -29,14 +29,36 @@ function snapValue(value: number, snapSize: SnapSize) {
   return Math.round(value / snapSize) * snapSize;
 }
 
-function clampPosition(roomValue: Room, item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation'>, x: number, y: number) {
+function clampPosition(roomValue: Room, item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation' | 'isWallAttached'>, x: number, y: number) {
   const footprint = getRotatedSize(item);
   const maxX = Math.max(0, roomValue.width - footprint.width);
   const maxY = Math.max(0, roomValue.height - footprint.height);
 
+  let clampedX = clamp(x, 0, maxX);
+  let clampedY = clamp(y, 0, maxY);
+
+  if (item.isWallAttached) {
+    const distLeft = clampedX;
+    const distRight = maxX - clampedX;
+    const distTop = clampedY;
+    const distBottom = maxY - clampedY;
+
+    const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+    if (minDist === distLeft) {
+      clampedX = 0;
+    } else if (minDist === distRight) {
+      clampedX = maxX;
+    } else if (minDist === distTop) {
+      clampedY = 0;
+    } else if (minDist === distBottom) {
+      clampedY = maxY;
+    }
+  }
+
   return {
-    x: clamp(x, 0, maxX),
-    y: clamp(y, 0, maxY),
+    x: clampedX,
+    y: clampedY,
   };
 }
 
@@ -113,6 +135,7 @@ export function useRoomLayout() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => loadSavedLayouts());
+  const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
@@ -135,6 +158,7 @@ export function useRoomLayout() {
       width: template.width,
       height: template.height,
       rotation: 0,
+      isWallAttached: template.isWallAttached,
       x: 24 + offset * 28,
       y: 24 + offset * 28,
     };
@@ -196,6 +220,7 @@ export function useRoomLayout() {
     setRoom(DEFAULT_ROOM);
     setItems([]);
     setSelectedId(null);
+    setCurrentLayoutId(null);
   };
 
   const resizeRoom = (width: number, height: number) => {
@@ -204,7 +229,7 @@ export function useRoomLayout() {
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
   };
 
-  const saveLayout = (name: string) => {
+  const saveLayout = (name: string, memo: string = '') => {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
@@ -215,6 +240,7 @@ export function useRoomLayout() {
     const nextLayout: SavedLayout = {
       id: createSavedLayoutId(),
       name: trimmedName,
+      memo: memo.trim(),
       room,
       items,
       updatedAt: now,
@@ -225,6 +251,7 @@ export function useRoomLayout() {
       persistSavedLayouts(nextLayouts);
       return nextLayouts;
     });
+    setCurrentLayoutId(nextLayout.id);
   };
 
   const loadLayout = (id: string) => {
@@ -238,11 +265,53 @@ export function useRoomLayout() {
     setRoom(layout.room);
     setItems(clampItemsToRoom(layout.room, layout.items));
     setSelectedId(null);
+    setCurrentLayoutId(layout.id);
   };
 
   const deleteLayout = (id: string) => {
     setSavedLayouts((currentLayouts) => {
       const nextLayouts = currentLayouts.filter((layout) => layout.id !== id);
+      persistSavedLayouts(nextLayouts);
+      return nextLayouts;
+    });
+    if (id === currentLayoutId) {
+      setCurrentLayoutId(null);
+    }
+  };
+
+  const updateCurrentLayout = () => {
+    if (!currentLayoutId) return;
+
+    setSavedLayouts((currentLayouts) => {
+      const nextLayouts = currentLayouts.map((layout) => {
+        if (layout.id !== currentLayoutId) {
+          return layout;
+        }
+        return {
+          ...layout,
+          room,
+          items,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      persistSavedLayouts(nextLayouts);
+      return nextLayouts;
+    });
+  };
+
+  const updateLayoutMeta = (id: string, name: string, memo: string) => {
+    setSavedLayouts((currentLayouts) => {
+      const nextLayouts = currentLayouts.map((layout) => {
+        if (layout.id !== id) {
+          return layout;
+        }
+        return {
+          ...layout,
+          name: name.trim() || layout.name, // fallback to old name if empty
+          memo: memo.trim(),
+          updatedAt: new Date().toISOString(), // Update timestamp on edit
+        };
+      });
       persistSavedLayouts(nextLayouts);
       return nextLayouts;
     });
@@ -267,5 +336,8 @@ export function useRoomLayout() {
     saveLayout,
     loadLayout,
     deleteLayout,
+    updateLayoutMeta,
+    currentLayoutId,
+    updateCurrentLayout,
   };
 }

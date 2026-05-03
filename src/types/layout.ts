@@ -17,6 +17,7 @@ export interface FurnitureTemplate extends Size {
   id: string;
   label: string;
   color: string;
+  isWallAttached?: boolean;
 }
 
 export interface PlacedFurniture extends Size, Position {
@@ -25,6 +26,7 @@ export interface PlacedFurniture extends Size, Position {
   label: string;
   color: string;
   rotation: Rotation;
+  isWallAttached?: boolean;
 }
 
 export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {}
@@ -32,6 +34,7 @@ export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position
 export interface SavedLayout {
   id: string;
   name: string;
+  memo: string;
   room: Room;
   items: PlacedFurniture[];
   updatedAt: string;
