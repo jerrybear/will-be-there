@@ -382,6 +382,9 @@ export function useRoomLayout() {
       templateId: template.id,
       label: template.label,
       color: template.color,
+      kind: template.kind,
+      objectHeight: template.objectHeight,
+      elevation: template.elevation ?? 0,
       width: template.width,
       height: template.height,
       rotation: 0,
@@ -540,6 +543,7 @@ export function useRoomLayout() {
 
     const now = new Date().toISOString();
     const nextLayout: SavedLayout = {
+      schemaVersion: 3,
       id: createSavedLayoutId(),
       name: trimmedName,
       memo: memo.trim(),

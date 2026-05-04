@@ -1,5 +1,7 @@
 export type Rotation = 0 | 90;
 export type SnapSize = 0 | 10 | 24;
+export type LayoutElementKind = 'furniture' | 'door' | 'window';
+export type ViewMode = '2d' | '3d';
 
 export interface Size {
   width: number;
@@ -17,6 +19,9 @@ export interface FurnitureTemplate extends Size {
   id: string;
   label: string;
   color: string;
+  kind: LayoutElementKind;
+  objectHeight: number;
+  elevation?: number;
   isWallAttached?: boolean;
 }
 
@@ -25,6 +30,9 @@ export interface PlacedFurniture extends Size, Position {
   templateId: string;
   label: string;
   color: string;
+  kind: LayoutElementKind;
+  objectHeight: number;
+  elevation: number;
   rotation: Rotation;
   isWallAttached?: boolean;
   doorHinge?: 'left' | 'right';
@@ -35,6 +43,7 @@ export interface PlacedFurniture extends Size, Position {
 export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {}
 
 export interface SavedLayout {
+  schemaVersion: number;
   id: string;
   name: string;
   memo: string;

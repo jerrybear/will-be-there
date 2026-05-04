@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlacedFurniture, Room } from '../types/layout';
+import { useCanvasViewport } from '../hooks/useCanvasViewport';
 import { CanvasFurnitureItem } from './CanvasFurnitureItem';
 
 interface RoomCanvasProps {
@@ -20,13 +21,19 @@ interface DragState {
 
 export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSelect, onMoveStart, onMove }: RoomCanvasProps) {
   const roomRef = useRef<HTMLDivElement | null>(null);
-  const shellRef = useRef<HTMLDivElement | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
-
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isSpaceDown, setIsSpaceDown] = useState(false);
-  const panStartRef = useRef<{ clientX: number, clientY: number, panX: number, panY: number } | null>(null);
+  const {
+    shellRef,
+    zoom,
+    pan,
+    isSpaceDown,
+    beginPan,
+    updatePan,
+    endPan,
+    zoomIn,
+    zoomOut,
+    resetViewport,
+  } = useCanvasViewport();
 
   useEffect(() => {
     if (!dragState) {
@@ -60,86 +67,20 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
     };
   }, [dragState, onMove, zoom]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') setIsSpaceDown(true);
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') setIsSpaceDown(false);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-    };
-  }, []);
-
-  useEffect(() => {
-    const shell = shellRef.current;
-    if (!shell) return;
-    
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) {
-        const zoomSensitivity = 0.002;
-        setZoom((prevZoom) => {
-          const newZoom = Math.max(0.1, Math.min(prevZoom - e.deltaY * zoomSensitivity, 5));
-          setPan((prevPan) => {
-            const rect = shell.getBoundingClientRect();
-            const cursorX = e.clientX - rect.left;
-            const cursorY = e.clientY - rect.top;
-            const localX = (cursorX - prevPan.x) / prevZoom;
-            const localY = (cursorY - prevPan.y) / prevZoom;
-            return {
-              x: cursorX - localX * newZoom,
-              y: cursorY - localY * newZoom,
-            };
-          });
-          return newZoom;
-        });
-      } else {
-        setPan((prev) => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY,
-        }));
-      }
-    };
-    
-    shell.addEventListener('wheel', handleWheel, { passive: false });
-    return () => shell.removeEventListener('wheel', handleWheel);
-  }, []);
-
   const handleShellPointerDown = (e: React.PointerEvent) => {
-    if (e.button === 1 || isSpaceDown) {
-      panStartRef.current = {
-        clientX: e.clientX,
-        clientY: e.clientY,
-        panX: pan.x,
-        panY: pan.y,
-      };
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } else {
+    const startedPan = beginPan(e);
+
+    if (!startedPan) {
       onSelect(null);
     }
   };
 
   const handleShellPointerMove = (e: React.PointerEvent) => {
-    if (panStartRef.current) {
-      const dx = e.clientX - panStartRef.current.clientX;
-      const dy = e.clientY - panStartRef.current.clientY;
-      setPan({
-        x: panStartRef.current.panX + dx,
-        y: panStartRef.current.panY + dy,
-      });
-    }
+    updatePan(e);
   };
 
   const handleShellPointerUp = (e: React.PointerEvent) => {
-    if (panStartRef.current) {
-      panStartRef.current = null;
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
+    endPan(e);
   };
 
   const handleItemPointerDown = (event: React.PointerEvent<HTMLButtonElement>, item: PlacedFurniture) => {
@@ -204,10 +145,10 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
       </div>
       </div>
       <div className="zoom-controls">
-        <button type="button" onClick={() => setZoom(z => Math.max(0.1, z - 0.2))}>-</button>
+        <button type="button" onClick={zoomOut}>-</button>
         <span>{Math.round(zoom * 100)}%</span>
-        <button type="button" onClick={() => setZoom(z => Math.min(5, z + 0.2))}>+</button>
-        <button type="button" onClick={() => { setZoom(1); setPan({x: 0, y: 0}); }}>초기화</button>
+        <button type="button" onClick={zoomIn}>+</button>
+        <button type="button" onClick={resetViewport}>초기화</button>
       </div>
     </section>
   );

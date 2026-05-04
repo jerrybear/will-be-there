@@ -42,6 +42,18 @@ function hasValidNumberDraft(values: string[]) {
   });
 }
 
+function formatElementKind(kind: PlacedFurniture['kind']) {
+  if (kind === 'door') {
+    return '문';
+  }
+
+  if (kind === 'window') {
+    return '창문';
+  }
+
+  return '가구';
+}
+
 export function InspectorPanel({
   room,
   item,
@@ -405,6 +417,18 @@ export function InspectorPanel({
         <div>
           <dt>회전</dt>
           <dd>{item.rotation}°</dd>
+        </div>
+        <div>
+          <dt>요소 종류</dt>
+          <dd>{formatElementKind(item.kind)}</dd>
+        </div>
+        <div>
+          <dt>3D 높이</dt>
+          <dd>{item.objectHeight}</dd>
+        </div>
+        <div>
+          <dt>바닥 높이</dt>
+          <dd>{item.elevation}</dd>
         </div>
       </dl>
 

@@ -7,6 +7,9 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     width: 80,
     height: 24,
     color: '#cbd5e1',
+    kind: 'door',
+    objectHeight: 210,
+    elevation: 0,
     isWallAttached: true,
   },
   {
@@ -15,6 +18,9 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     width: 120,
     height: 24,
     color: '#bae6fd',
+    kind: 'window',
+    objectHeight: 100,
+    elevation: 90,
     isWallAttached: true,
   },
   {
@@ -23,6 +29,9 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     width: 180,
     height: 100,
     color: '#7c9cf5',
+    kind: 'furniture',
+    objectHeight: 45,
+    elevation: 0,
   },
   {
     id: 'desk',
@@ -30,6 +39,9 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     width: 140,
     height: 70,
     color: '#6bc3a2',
+    kind: 'furniture',
+    objectHeight: 74,
+    elevation: 0,
   },
   {
     id: 'sofa',
@@ -37,5 +49,8 @@ export const furnitureCatalog: FurnitureTemplate[] = [
     width: 160,
     height: 90,
     color: '#f2a86b',
+    kind: 'furniture',
+    objectHeight: 80,
+    elevation: 0,
   },
 ];

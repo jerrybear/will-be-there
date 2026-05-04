@@ -1,10 +1,14 @@
+import { useState } from 'react';
 import { FurniturePalette } from './components/FurniturePalette';
 import { InspectorPanel } from './components/InspectorPanel';
+import { Preview3DPlaceholder } from './components/Preview3DPlaceholder';
 import { RoomCanvas } from './components/RoomCanvas';
 import { TopBar } from './components/TopBar';
 import { useRoomLayout } from './state/useRoomLayout';
+import type { ViewMode } from './types/layout';
 
 export default function App() {
+  const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const {
     room,
     catalog,
@@ -43,12 +47,14 @@ export default function App() {
   return (
     <div className="app-shell">
       <TopBar
+        viewMode={viewMode}
         savedLayouts={savedLayouts}
         currentLayoutId={currentLayout?.id ?? null}
         hasUnsavedChanges={hasUnsavedChanges}
         canUndo={canUndo}
         canRedo={canRedo}
         onReset={resetLayout}
+        onViewModeChange={setViewMode}
         onUndo={undoLayoutChange}
         onRedo={redoLayoutChange}
         onLoad={loadLayout}
@@ -58,15 +64,19 @@ export default function App() {
 
       <main className="workspace-grid">
         <FurniturePalette items={catalog} onAdd={addFurniture} />
-        <RoomCanvas
-          room={room}
-          items={items}
-          selectedId={selectedId}
-          overlappingItemIds={overlappingItemIds}
-          onSelect={selectFurniture}
-          onMoveStart={beginFurnitureMove}
-          onMove={moveFurniture}
-        />
+        {viewMode === '2d' ? (
+          <RoomCanvas
+            room={room}
+            items={items}
+            selectedId={selectedId}
+            overlappingItemIds={overlappingItemIds}
+            onSelect={selectFurniture}
+            onMoveStart={beginFurnitureMove}
+            onMove={moveFurniture}
+          />
+        ) : (
+          <Preview3DPlaceholder room={room} items={items} />
+        )}
         <InspectorPanel
           room={room}
           item={selectedItem}

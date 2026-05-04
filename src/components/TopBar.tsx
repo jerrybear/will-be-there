@@ -1,13 +1,15 @@
 import { useState } from 'react';
-import type { SavedLayout } from '../types/layout';
+import type { SavedLayout, ViewMode } from '../types/layout';
 
 interface TopBarProps {
+  viewMode: ViewMode;
   savedLayouts: SavedLayout[];
   currentLayoutId: string | null;
   hasUnsavedChanges: boolean;
   canUndo: boolean;
   canRedo: boolean;
   onReset: () => void;
+  onViewModeChange: (mode: ViewMode) => void;
   onUndo: () => void;
   onRedo: () => void;
   onLoad: (id: string) => void;
@@ -25,12 +27,14 @@ function formatSavedTime(value: string) {
 }
 
 export function TopBar({
+  viewMode,
   savedLayouts,
   currentLayoutId,
   hasUnsavedChanges,
   canUndo,
   canRedo,
   onReset,
+  onViewModeChange,
   onUndo,
   onRedo,
   onLoad,
@@ -67,6 +71,22 @@ export function TopBar({
         <p>옮기기 전에, 여기 한번 놔보기</p>
       </div>
       <div className="top-bar-actions">
+        <div className="view-mode-toggle" aria-label="보기 전환">
+          <button
+            type="button"
+            className={viewMode === '2d' ? 'active' : ''}
+            onClick={() => onViewModeChange('2d')}
+          >
+            2D 편집
+          </button>
+          <button
+            type="button"
+            className={viewMode === '3d' ? 'active' : ''}
+            onClick={() => onViewModeChange('3d')}
+          >
+            3D 미리보기
+          </button>
+        </div>
         <div className="history-actions">
           <button type="button" className="ghost-button compact-button" onClick={onUndo} disabled={!canUndo}>
             Undo

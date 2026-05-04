@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "outDir": "/private/tmp/will-be-there-storage-tests",
+    "rootDir": ".",
+    "noEmit": false,
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "verbatimModuleSyntax": false
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "src/data/furnitureCatalog.ts",
+    "src/state/layoutStorage.ts",
+    "src/types/layout.ts"
+  ]
+}

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "test:migrations": "tsc -p tsconfig.test.json && node /private/tmp/will-be-there-storage-tests/scripts/layout-storage-migration.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
