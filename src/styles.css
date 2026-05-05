@@ -244,11 +244,7 @@ button {
   overflow: hidden;
   border: 2px solid #cfd7e6;
   border-radius: 0;
-  background:
-    linear-gradient(90deg, rgba(177, 188, 214, 0.12) 1px, transparent 1px),
-    linear-gradient(rgba(177, 188, 214, 0.12) 1px, transparent 1px),
-    #eef2f7;
-  background-size: 24px 24px;
+  background: #eef2f7;
 }
 
 .room-shape-layer {
@@ -259,7 +255,18 @@ button {
 }
 
 .room-shape-fill {
-  fill: #fdfefe;
+  fill: rgba(253, 254, 254, 0.9);
+}
+
+.room-shape-grid {
+  pointer-events: none;
+}
+
+.room-grid-line {
+  fill: none;
+  stroke: rgba(100, 116, 139, 0.24);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
 .room-shape-outline {

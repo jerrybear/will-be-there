@@ -93,6 +93,7 @@ export default function App() {
             selectedId={selectedId}
             isRoomEditingEnabled={isRoomEditingEnabled}
             isSelfIntersecting={isSelfIntersecting}
+            snapSize={snapSize}
             overlappingItemIds={overlappingItemIds}
             onSelect={selectFurniture}
             onMoveStart={beginFurnitureMove}

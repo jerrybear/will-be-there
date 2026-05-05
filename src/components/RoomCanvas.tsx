@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { PlacedFurniture, Room } from '../types/layout';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { PlacedFurniture, Room, SnapSize } from '../types/layout';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
 import { getRoomOutlinePoints, getRoomShape, getSvgPoints } from '../utils/geometry';
 import { CanvasFurnitureItem } from './CanvasFurnitureItem';
@@ -10,6 +10,7 @@ interface RoomCanvasProps {
   selectedId: string | null;
   isRoomEditingEnabled: boolean;
   isSelfIntersecting: boolean;
+  snapSize: SnapSize;
   overlappingItemIds: Set<string>;
   onSelect: (id: string | null) => void;
   onMoveStart: () => void;
@@ -36,6 +37,7 @@ export function RoomCanvas({
   selectedId,
   isRoomEditingEnabled,
   isSelfIntersecting,
+  snapSize,
   overlappingItemIds,
   onSelect,
   onMoveStart,
@@ -63,6 +65,9 @@ export function RoomCanvas({
     zoomOut,
     resetViewport,
   } = useCanvasViewport();
+  const reactId = useId();
+  const gridPatternId = `room-grid-${reactId.replace(/:/g, '')}`;
+  const gridSize = snapSize || 24;
 
   useEffect(() => {
     if (!dragState) {
@@ -230,7 +235,13 @@ export function RoomCanvas({
             }}
           >
             <svg className="room-shape-layer" viewBox={`0 0 ${room.width} ${room.height}`} aria-hidden="true">
+              <defs>
+                <pattern id={gridPatternId} width={gridSize} height={gridSize} patternUnits="userSpaceOnUse">
+                  <path d={`M ${gridSize} 0 L 0 0 0 ${gridSize}`} className="room-grid-line" />
+                </pattern>
+              </defs>
               <polygon className="room-shape-fill" points={roomOutlinePoints} />
+              <polygon className="room-shape-grid" points={roomOutlinePoints} fill={`url(#${gridPatternId})`} />
               {roomShape.obstacles.map((obstacle) => {
                 if (obstacle.type === 'rect') {
                   return (

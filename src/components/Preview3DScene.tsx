@@ -66,8 +66,8 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
     let previousX = 0;
     let previousY = 0;
     let yaw = -0.72;
-    let pitch = 0.78;
-    let distance = roomSpan * 1.36;
+    let pitch = 0.72;
+    let distance = roomSpan * 1.82;
 
     const updateCamera = () => {
       const clampedPitch = Math.max(0.34, Math.min(1.18, pitch));
@@ -110,7 +110,7 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      distance = Math.max(roomSpan * 0.72, Math.min(roomSpan * 2.4, distance + event.deltaY * 0.01));
+      distance = Math.max(roomSpan * 0.9, Math.min(roomSpan * 2.8, distance + event.deltaY * 0.01));
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);

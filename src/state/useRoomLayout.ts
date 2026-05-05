@@ -140,7 +140,10 @@ function snapPositionToWall(
   x: number,
   y: number,
 ) {
-  const projection = getNearestWallProjection(roomValue, { x, y });
+  const currentFootprint = getRotatedSize(item);
+  const centerX = x + currentFootprint.width / 2;
+  const centerY = y + currentFootprint.height / 2;
+  const projection = getNearestWallProjection(roomValue, { x: centerX, y: centerY });
 
   if (!projection) {
     return {

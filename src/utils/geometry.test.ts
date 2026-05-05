@@ -6,6 +6,7 @@ import {
   createRectRoom,
   createRectRoomShape,
   projectPointToSegment,
+  projectItemToWallLocal,
   segmentsIntersect,
   hasPolygonSelfIntersection
 } from './geometry';
@@ -119,6 +120,26 @@ describe('geometry utilities', () => {
       const point: Position = { x: 150, y: 50 };
       const projection = projectPointToSegment(point, segment);
       expect(projection).toEqual({ x: 100, y: 0 });
+    });
+  });
+
+  describe('projectItemToWallLocal', () => {
+    const segment = {
+      id: 'wall-1',
+      start: { x: 0, y: 0 },
+      end: { x: 200, y: 0 },
+    };
+
+    it('should use the rotated footprint center for wall-local projection', () => {
+      const item = {
+        x: 40,
+        y: 0,
+        width: 20,
+        height: 80,
+        rotation: 90,
+      };
+
+      expect(projectItemToWallLocal(segment, item)).toBe(80);
     });
   });
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { PlacedFurniture, Position, Room, RoomObstacle } from '../types/layout';
-import { getRoomShape, getRoomWallSegments, getSegmentAngle, getNearestWallProjection, projectItemToWallLocal } from './geometry';
+import { getItemPlacementRect, getRoomShape, getRoomWallSegments, getSegmentAngle, getNearestWallProjection, projectItemToWallLocal } from './geometry';
 import type { WallSegment } from './geometry';
 
 const UNIT_SCALE = 0.01;
@@ -67,9 +67,9 @@ function resolveWallSegment(
     if (match) return match;
   }
 
-  // Fallback: project item center to nearest wall
-  const centerX = item.x + item.width / 2;
-  const centerY = item.y + item.height / 2;
+  const placementRect = getItemPlacementRect(item, item.x, item.y);
+  const centerX = placementRect.x + placementRect.width / 2;
+  const centerY = placementRect.y + placementRect.height / 2;
   const projection = getNearestWallProjection(room, { x: centerX, y: centerY });
   return projection ? projection.segment : null;
 }
@@ -303,6 +303,7 @@ export function createItemMesh(room: Room, item: PlacedFurniture) {
   const depth = toWorldLength(item.height);
   const height = Math.max(toWorldLength(item.objectHeight), toWorldLength(4));
   const elevation = toWorldLength(item.elevation);
+  const placementRect = getItemPlacementRect(item, item.x, item.y);
   const geometry = new THREE.BoxGeometry(width, height, depth);
   const material = new THREE.MeshStandardMaterial({
     color: new THREE.Color(item.color),
@@ -312,9 +313,9 @@ export function createItemMesh(room: Room, item: PlacedFurniture) {
   const mesh = new THREE.Mesh(geometry, material);
 
   mesh.position.set(
-    toWorldX(room, item.x + item.width / 2),
+    toWorldX(room, placementRect.x + placementRect.width / 2),
     elevation + height / 2,
-    toWorldZ(room, item.y + item.height / 2),
+    toWorldZ(room, placementRect.y + placementRect.height / 2),
   );
   mesh.rotation.y = -item.rotation * Math.PI / 180;
   mesh.castShadow = true;
