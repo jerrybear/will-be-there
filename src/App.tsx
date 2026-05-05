@@ -4,6 +4,7 @@ import { InspectorPanel } from './components/InspectorPanel';
 import { RoomCanvas } from './components/RoomCanvas';
 import { TopBar } from './components/TopBar';
 import { useRoomLayout } from './state/useRoomLayout';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import type { ViewMode } from './types/layout';
 
 const Preview3DScene = lazy(() =>
@@ -64,7 +65,25 @@ export default function App() {
     currentRoomId,
     undoLayoutChange,
     redoLayoutChange,
+    copyFurniture,
+    pasteFurniture,
   } = useRoomLayout();
+
+  useKeyboardShortcuts({
+    selectedId,
+    selectedItem,
+    snapSize,
+    onSelect: selectFurniture,
+    onDelete: deleteFurniture,
+    onCopy: copyFurniture,
+    onPaste: pasteFurniture,
+    onMove: moveFurniture,
+    onRotate: rotateFurniture,
+    onUndo: undoLayoutChange,
+    onRedo: redoLayoutChange,
+    onSnapSizeChange: setSnapSize,
+    isRoomEditingEnabled,
+  });
 
   return (
     <div className="app-shell">

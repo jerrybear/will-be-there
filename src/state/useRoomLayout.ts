@@ -345,6 +345,7 @@ export function useRoomLayout() {
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [clipboard, setClipboard] = useState<PlacedFurniture | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
   const [savedRooms, setSavedRooms] = useState<SavedRoom[]>(() => initialWorkspaceState.rooms);
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => initialWorkspaceState.layouts);
@@ -611,6 +612,29 @@ export function useRoomLayout() {
 
     setItems((currentItems) => [...currentItems, nextItem]);
     setSelectedId(nextItem.id);
+  };
+
+  const copyFurniture = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    if (item) {
+      setClipboard(item);
+    }
+  };
+
+  const pasteFurniture = () => {
+    if (!clipboard) return;
+
+    recordHistory();
+    const newItem: PlacedFurniture = {
+      ...clipboard,
+      id: createFurnitureId(),
+      x: clipboard.x + 28,
+      y: clipboard.y + 28,
+    };
+    
+    const finalizedItem = applyFurnitureGeometry(room, newItem, { x: newItem.x, y: newItem.y }, snapSize);
+    setItems((current) => [...current, finalizedItem]);
+    setSelectedId(finalizedItem.id);
   };
 
   const deleteFurniture = (id: string) => {
@@ -1053,5 +1077,7 @@ export function useRoomLayout() {
     updateCurrentLayout,
     undoLayoutChange,
     redoLayoutChange,
+    copyFurniture,
+    pasteFurniture,
   };
 }
