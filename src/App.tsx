@@ -43,6 +43,7 @@ export default function App() {
     resetLayout,
     resizeRoom,
     applyRoomShapePreset,
+    applyRoomJson,
     beginRoomShapeEdit,
     moveRoomPoint,
     addRoomPoint,
@@ -123,6 +124,7 @@ export default function App() {
           onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}
           onApplyRoomShapePreset={applyRoomShapePreset}
+          onApplyRoomJson={applyRoomJson}
           onAddPillar={addPillar}
           onDeleteRoomObstacle={deleteRoomObstacle}
           onUpdateRoomObstacle={updateRoomObstacle}

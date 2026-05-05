@@ -67,7 +67,11 @@ export interface PlacedFurniture extends Size, Position {
   showDoorSwing?: boolean;
 }
 
-export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {}
+export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {
+  objectHeight?: number;
+  elevation?: number;
+  color?: string;
+}
 
 export interface SavedRoom {
   schemaVersion: number;

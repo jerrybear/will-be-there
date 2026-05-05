@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { FurnitureGeometryUpdate, PlacedFurniture } from '../types/layout';
 import type { Room } from '../types/layout';
@@ -28,6 +28,7 @@ interface InspectorPanelProps {
   onSnapSizeChange: (snapSize: SnapSize) => void;
   onResizeRoom: (width: number, height: number) => void;
   onApplyRoomShapePreset: (preset: RoomShapePreset) => void;
+  onApplyRoomJson: (room: Room) => void;
   onAddPillar: () => void;
   onDeleteRoomObstacle: (id: string) => void;
   onUpdateRoomObstacle: (id: string, update: Partial<Extract<RoomObstacle, { type: 'rect' }>>) => void;
@@ -59,6 +60,10 @@ function hasValidNumberDraft(values: string[]) {
   });
 }
 
+function isValidHexColor(value: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(value);
+}
+
 function formatElementKind(kind: PlacedFurniture['kind']) {
   if (kind === 'door') {
     return '문';
@@ -69,6 +74,230 @@ function formatElementKind(kind: PlacedFurniture['kind']) {
   }
 
   return '가구';
+}
+
+function formatRoomJson(room: Room) {
+  const shape = getRoomShape(room);
+
+  return JSON.stringify(
+    {
+      width: room.width,
+      height: room.height,
+      points: shape.points.map((point) => ({
+        id: point.id,
+        x: point.x,
+        y: point.y,
+      })),
+      obstacles: shape.obstacles,
+    },
+    null,
+    2,
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function parseNumber(value: unknown, fieldName: string) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new Error(`${fieldName} 값은 숫자여야 합니다.`);
+  }
+
+  return Math.round(value);
+}
+
+function parseId(value: unknown, fallback: string, usedIds: Set<string>) {
+  const candidate = typeof value === 'string' && value.trim() ? value.trim() : fallback;
+  let nextId = candidate;
+  let suffix = 1;
+
+  while (usedIds.has(nextId)) {
+    nextId = `${candidate}-${suffix}`;
+    suffix += 1;
+  }
+
+  usedIds.add(nextId);
+  return nextId;
+}
+
+function getJsonSyntaxError(value: string) {
+  try {
+    JSON.parse(value);
+    return null;
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      return null;
+    }
+
+    const positionMatch = error.message.match(/position (\d+)/i);
+    const position = positionMatch ? Number(positionMatch[1]) : null;
+
+    return {
+      message: 'JSON 문법을 확인해 주세요.',
+      position: Number.isFinite(position) ? position : null,
+    };
+  }
+}
+
+function getJsonTokenClass(token: string) {
+  if (/^"/.test(token)) {
+    return /:\s*$/.test(token) ? 'json-token-key' : 'json-token-string';
+  }
+
+  if (/^-?\d/.test(token)) {
+    return 'json-token-number';
+  }
+
+  if (token === 'true' || token === 'false') {
+    return 'json-token-boolean';
+  }
+
+  if (token === 'null') {
+    return 'json-token-null';
+  }
+
+  return 'json-token-punctuation';
+}
+
+function renderHighlightedJson(value: string, errorPosition: number | null) {
+  const tokenPattern = /("(?:\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\btrue\b|\bfalse\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|[{}\[\],:])/g;
+  const nodes = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let key = 0;
+
+  while ((match = tokenPattern.exec(value))) {
+    if (match.index > lastIndex) {
+      const text = value.slice(lastIndex, match.index);
+      nodes.push(<Fragment key={`text-${key}`}>{text}</Fragment>);
+      key += 1;
+    }
+
+    const token = match[0];
+    const tokenEnd = match.index + token.length;
+    const hasError = errorPosition !== null && errorPosition >= match.index && errorPosition <= tokenEnd;
+    nodes.push(
+      <span key={`token-${key}`} className={`${getJsonTokenClass(token)} ${hasError ? 'json-token-error' : ''}`}>
+        {token}
+      </span>,
+    );
+    key += 1;
+    lastIndex = tokenEnd;
+  }
+
+  if (lastIndex < value.length) {
+    nodes.push(<Fragment key={`text-${key}`}>{value.slice(lastIndex)}</Fragment>);
+  }
+
+  if (!value.endsWith('\n')) {
+    nodes.push(<Fragment key="trailing-newline">{'\n'}</Fragment>);
+  }
+
+  return nodes;
+}
+
+function parseRoomJson(value: string): Room {
+  let parsedValue: unknown;
+
+  try {
+    parsedValue = JSON.parse(value);
+  } catch {
+    throw new Error('JSON 문법을 확인해 주세요.');
+  }
+
+  if (!isRecord(parsedValue)) {
+    throw new Error('최상위 값은 객체여야 합니다.');
+  }
+
+  const width = parseNumber(parsedValue.width, 'width');
+  const height = parseNumber(parsedValue.height, 'height');
+
+  if (width <= 0 || height <= 0) {
+    throw new Error('width와 height는 0보다 커야 합니다.');
+  }
+
+  if (!Array.isArray(parsedValue.points) || parsedValue.points.length < 3) {
+    throw new Error('points는 최소 3개 이상이어야 합니다.');
+  }
+
+  const pointIds = new Set<string>();
+  const points = parsedValue.points.map((point, index) => {
+    if (!isRecord(point)) {
+      throw new Error(`points[${index}]는 객체여야 합니다.`);
+    }
+
+    return {
+      id: parseId(point.id, `point-json-${index}`, pointIds),
+      x: Math.max(0, Math.min(width, parseNumber(point.x, `points[${index}].x`))),
+      y: Math.max(0, Math.min(height, parseNumber(point.y, `points[${index}].y`))),
+    };
+  });
+
+  const obstacleIds = new Set<string>();
+  const obstacles = Array.isArray(parsedValue.obstacles)
+    ? parsedValue.obstacles.map((obstacle, index): RoomObstacle => {
+        if (!isRecord(obstacle)) {
+          throw new Error(`obstacles[${index}]는 객체여야 합니다.`);
+        }
+
+        const type = obstacle.type ?? 'rect';
+        const label = typeof obstacle.label === 'string' && obstacle.label.trim() ? obstacle.label : '기둥';
+        const id = parseId(obstacle.id, `obstacle-json-${index}`, obstacleIds);
+
+        if (type === 'rect') {
+          const obstacleWidth = Math.max(1, Math.min(width, parseNumber(obstacle.width, `obstacles[${index}].width`)));
+          const obstacleHeight = Math.max(1, Math.min(height, parseNumber(obstacle.height, `obstacles[${index}].height`)));
+
+          return {
+            id,
+            type: 'rect',
+            label,
+            x: Math.max(0, Math.min(width - obstacleWidth, parseNumber(obstacle.x, `obstacles[${index}].x`))),
+            y: Math.max(0, Math.min(height - obstacleHeight, parseNumber(obstacle.y, `obstacles[${index}].y`))),
+            width: obstacleWidth,
+            height: obstacleHeight,
+          };
+        }
+
+        if (type === 'polygon') {
+          if (!Array.isArray(obstacle.points) || obstacle.points.length < 3) {
+            throw new Error(`obstacles[${index}].points는 최소 3개 이상이어야 합니다.`);
+          }
+
+          const obstaclePointIds = new Set<string>();
+
+          return {
+            id,
+            type: 'polygon',
+            label,
+            points: obstacle.points.map((point, pointIndex) => {
+              if (!isRecord(point)) {
+                throw new Error(`obstacles[${index}].points[${pointIndex}]는 객체여야 합니다.`);
+              }
+
+              return {
+                id: parseId(point.id, `obstacle-${index}-point-${pointIndex}`, obstaclePointIds),
+                x: Math.max(0, Math.min(width, parseNumber(point.x, `obstacles[${index}].points[${pointIndex}].x`))),
+                y: Math.max(0, Math.min(height, parseNumber(point.y, `obstacles[${index}].points[${pointIndex}].y`))),
+              };
+            }),
+          };
+        }
+
+        throw new Error(`obstacles[${index}].type은 rect 또는 polygon이어야 합니다.`);
+      })
+    : [];
+
+  return {
+    width,
+    height,
+    shape: {
+      type: 'polygon',
+      points,
+      obstacles,
+    },
+  };
 }
 
 export function InspectorPanel({
@@ -90,6 +319,7 @@ export function InspectorPanel({
   onSnapSizeChange,
   onResizeRoom,
   onApplyRoomShapePreset,
+  onApplyRoomJson,
   onAddPillar,
   onDeleteRoomObstacle,
   onUpdateRoomObstacle,
@@ -108,6 +338,10 @@ export function InspectorPanel({
   const [layoutMemo, setLayoutMemo] = useState('');
   const [roomName, setRoomName] = useState('');
   const [roomMemo, setRoomMemo] = useState('');
+  const [isRoomJsonOpen, setIsRoomJsonOpen] = useState(false);
+  const [roomJsonDraft, setRoomJsonDraft] = useState('');
+  const [roomJsonError, setRoomJsonError] = useState('');
+  const roomJsonHighlightRef = useRef<HTMLPreElement>(null);
   const [roomDraft, setRoomDraft] = useState({
     width: String(room.width),
     height: String(room.height),
@@ -117,6 +351,9 @@ export function InspectorPanel({
     y: '',
     width: '',
     height: '',
+    objectHeight: '',
+    elevation: '',
+    color: '#94a3b8',
   });
   const [labelDraft, setLabelDraft] = useState('');
 
@@ -125,7 +362,9 @@ export function InspectorPanel({
       width: String(room.width),
       height: String(room.height),
     });
-  }, [room.width, room.height]);
+    setRoomJsonDraft(formatRoomJson(room));
+    setRoomJsonError('');
+  }, [room]);
 
   useEffect(() => {
     if (!item) {
@@ -134,6 +373,9 @@ export function InspectorPanel({
         y: '',
         width: '',
         height: '',
+        objectHeight: '',
+        elevation: '',
+        color: '#94a3b8',
       });
       setLabelDraft('');
       return;
@@ -144,9 +386,12 @@ export function InspectorPanel({
       y: String(Math.round(item.y)),
       width: String(Math.round(item.width)),
       height: String(Math.round(item.height)),
+      objectHeight: String(Math.round(item.objectHeight)),
+      elevation: String(Math.round(item.elevation)),
+      color: item.color,
     });
     setLabelDraft(item.label);
-  }, [item?.id, item?.x, item?.y, item?.width, item?.height]);
+  }, [item?.id, item?.x, item?.y, item?.width, item?.height, item?.objectHeight, item?.elevation, item?.color]);
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -174,12 +419,17 @@ export function InspectorPanel({
     furnitureDraft.y,
     furnitureDraft.width,
     furnitureDraft.height,
-  ]) && Number(furnitureDraft.width) > 0 && Number(furnitureDraft.height) > 0;
+    furnitureDraft.objectHeight,
+    furnitureDraft.elevation,
+  ]) && Number(furnitureDraft.width) > 0 && Number(furnitureDraft.height) > 0 && Number(furnitureDraft.objectHeight) > 0 && isValidHexColor(furnitureDraft.color);
   const hasFurnitureChanges = !!item && (
     Number(furnitureDraft.x) !== Math.round(item.x) ||
     Number(furnitureDraft.y) !== Math.round(item.y) ||
     Number(furnitureDraft.width) !== Math.round(item.width) ||
-    Number(furnitureDraft.height) !== Math.round(item.height)
+    Number(furnitureDraft.height) !== Math.round(item.height) ||
+    Number(furnitureDraft.objectHeight) !== Math.round(item.objectHeight) ||
+    Number(furnitureDraft.elevation) !== Math.round(item.elevation) ||
+    furnitureDraft.color.toLowerCase() !== item.color.toLowerCase()
   );
 
   const handleRoomSizeApply = (event: FormEvent<HTMLFormElement>) => {
@@ -204,6 +454,9 @@ export function InspectorPanel({
       y: Number(furnitureDraft.y),
       width: Number(furnitureDraft.width),
       height: Number(furnitureDraft.height),
+      objectHeight: Number(furnitureDraft.objectHeight),
+      elevation: Number(furnitureDraft.elevation),
+      color: furnitureDraft.color,
     });
   };
 
@@ -221,6 +474,24 @@ export function InspectorPanel({
     }
 
     onUpdateRoomObstacle(id, { x, y, width, height });
+  };
+
+  const handleRoomJsonApply = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      const nextRoom = parseRoomJson(roomJsonDraft);
+      onApplyRoomJson(nextRoom);
+      setRoomJsonDraft(formatRoomJson(nextRoom));
+      setRoomJsonError('');
+    } catch (error) {
+      setRoomJsonError(error instanceof Error ? error.message : 'JSON을 적용할 수 없습니다.');
+    }
+  };
+
+  const handleRoomJsonReset = () => {
+    setRoomJsonDraft(formatRoomJson(room));
+    setRoomJsonError('');
   };
 
   const handleRename = (event: FormEvent<HTMLFormElement>) => {
@@ -250,6 +521,8 @@ export function InspectorPanel({
   const currentLayout = savedLayouts.find((l) => l.id === currentLayoutId);
   const roomShape = getRoomShape(room);
   const roomLayouts = currentRoomId ? savedLayouts.filter((layout) => layout.roomId === currentRoomId) : savedLayouts;
+  const roomJsonSyntaxError = getJsonSyntaxError(roomJsonDraft);
+  const roomJsonErrorMessage = roomJsonError || roomJsonSyntaxError?.message;
 
   const savedRoomsSection = (
     <div className="saved-layouts room-library">
@@ -508,6 +781,50 @@ export function InspectorPanel({
       ) : (
         <p>방 안의 배치 불가 영역이 없습니다.</p>
       )}
+      {isRoomEditingEnabled && (
+        <div className="room-json-editor">
+          <button type="button" className="ghost-button compact-button" onClick={() => setIsRoomJsonOpen((isOpen) => !isOpen)}>
+            JSON 편집
+          </button>
+          {isRoomJsonOpen && (
+            <form className="room-json-form" onSubmit={handleRoomJsonApply}>
+              <div className={`json-editor-shell ${roomJsonErrorMessage ? 'has-error' : ''}`}>
+                <pre ref={roomJsonHighlightRef} className="json-highlight" aria-hidden="true">
+                  {renderHighlightedJson(roomJsonDraft, roomJsonSyntaxError?.position ?? null)}
+                </pre>
+                <textarea
+                  value={roomJsonDraft}
+                  onChange={(event) => {
+                    setRoomJsonDraft(event.target.value);
+                    setRoomJsonError('');
+                  }}
+                  onScroll={(event) => {
+                    if (!roomJsonHighlightRef.current) {
+                      return;
+                    }
+
+                    roomJsonHighlightRef.current.scrollTop = event.currentTarget.scrollTop;
+                    roomJsonHighlightRef.current.scrollLeft = event.currentTarget.scrollLeft;
+                  }}
+                  spellCheck={false}
+                  rows={14}
+                  aria-invalid={!!roomJsonErrorMessage}
+                  aria-label="방 JSON"
+                />
+              </div>
+              {roomJsonErrorMessage && <p className="form-error">{roomJsonErrorMessage}</p>}
+              <div className="json-actions">
+                <button type="submit" className="primary-button compact-button">
+                  적용
+                </button>
+                <button type="button" className="ghost-button compact-button" onClick={handleRoomJsonReset}>
+                  되돌리기
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -569,7 +886,7 @@ export function InspectorPanel({
           />
         </label>
         <label>
-          <span>폭</span>
+          <span>가로</span>
           <input
             type="number"
             min="20"
@@ -579,7 +896,7 @@ export function InspectorPanel({
           />
         </label>
         <label>
-          <span>높이</span>
+          <span>깊이</span>
           <input
             type="number"
             min="20"
@@ -587,6 +904,46 @@ export function InspectorPanel({
             value={furnitureDraft.height}
             onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, height: event.target.value }))}
           />
+        </label>
+        <label>
+          <span>높이</span>
+          <input
+            type="number"
+            min="1"
+            max="400"
+            step="1"
+            value={furnitureDraft.objectHeight}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, objectHeight: event.target.value }))}
+          />
+        </label>
+        <label>
+          <span>설치 높이</span>
+          <input
+            type="number"
+            min="0"
+            max="400"
+            step="1"
+            value={furnitureDraft.elevation}
+            onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, elevation: event.target.value }))}
+          />
+        </label>
+        <label className="color-field">
+          <span>색상</span>
+          <div className="color-input-row">
+            <input
+              type="color"
+              value={isValidHexColor(furnitureDraft.color) ? furnitureDraft.color : '#94a3b8'}
+              onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, color: event.target.value }))}
+              aria-label="가구 색상 선택"
+            />
+            <input
+              type="text"
+              value={furnitureDraft.color}
+              onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, color: event.target.value }))}
+              aria-label="가구 색상 hex"
+              placeholder="#94a3b8"
+            />
+          </div>
         </label>
       </div>
       <button type="submit" className="primary-button compact-button" disabled={!hasValidFurnitureDraft || !hasFurnitureChanges}>
@@ -625,9 +982,9 @@ export function InspectorPanel({
           <dd>{Math.round(item.y)}</dd>
         </div>
         <div>
-          <dt>기본 크기</dt>
+          <dt>가로 × 깊이 × 높이</dt>
           <dd>
-            {item.width} × {item.height}
+            {item.width} × {item.height} × {item.objectHeight}
           </dd>
         </div>
         <div>
@@ -645,17 +1002,13 @@ export function InspectorPanel({
           <dd>{formatElementKind(item.kind)}</dd>
         </div>
         <div>
-          <dt>3D 높이</dt>
-          <dd>{item.objectHeight}</dd>
-        </div>
-        <div>
-          <dt>바닥 높이</dt>
+          <dt>설치 높이</dt>
           <dd>{item.elevation}</dd>
         </div>
       </dl>
 
       <div className="furniture-editor">
-        <h3>위치/크기</h3>
+        <h3>위치/3D 크기</h3>
         {furnitureGeometrySection}
       </div>
 

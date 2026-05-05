@@ -184,8 +184,15 @@ button {
 }
 
 .palette-size {
+  display: grid;
+  gap: 2px;
   font-size: 13px;
   color: #5b6473;
+}
+
+.palette-size-label {
+  font-size: 11px;
+  color: #7b8494;
 }
 
 .canvas-panel {
@@ -662,6 +669,105 @@ button {
   justify-content: flex-end;
 }
 
+.room-json-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.room-json-form {
+  display: grid;
+  gap: 10px;
+}
+
+.json-editor-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 220px;
+  border: 1px solid #cfd7e6;
+  border-radius: 8px;
+  background: #0f172a;
+  overflow: hidden;
+}
+
+.json-editor-shell.has-error {
+  border-color: #dc2626;
+}
+
+.json-highlight,
+.room-json-form textarea {
+  margin: 0;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.json-highlight {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: #d1d5db;
+  pointer-events: none;
+}
+
+.room-json-form textarea {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 220px;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  caret-color: #ffffff;
+  resize: vertical;
+}
+
+.room-json-form textarea:focus {
+  outline: 2px solid rgba(124, 156, 245, 0.32);
+}
+
+.json-token-key {
+  color: #93c5fd;
+}
+
+.json-token-string {
+  color: #86efac;
+}
+
+.json-token-number {
+  color: #fcd34d;
+}
+
+.json-token-boolean,
+.json-token-null {
+  color: #f0abfc;
+}
+
+.json-token-punctuation {
+  color: #cbd5e1;
+}
+
+.json-token-error {
+  background: rgba(220, 38, 38, 0.5);
+  color: #ffffff;
+}
+
+.form-error {
+  margin: 0;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.json-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .obstacle-row span,
 .obstacle-fields span {
   color: #5b6473;
@@ -703,6 +809,17 @@ button {
   gap: 8px;
 }
 
+.dimension-fields .color-field {
+  grid-column: 1 / -1;
+}
+
+.color-input-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
 .dimension-fields label,
 .snap-editor label {
   display: grid;
@@ -731,6 +848,12 @@ button {
   font: inherit;
   color: #1f2937;
   background: #ffffff;
+}
+
+.dimension-fields input[type='color'] {
+  width: 44px;
+  height: 38px;
+  padding: 3px;
 }
 
 .dimension-fields input:focus,

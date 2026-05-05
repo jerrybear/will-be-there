@@ -23,6 +23,9 @@ const MIN_ROOM_HEIGHT = 180;
 const MAX_ROOM_WIDTH = 1200;
 const MAX_ROOM_HEIGHT = 900;
 const MIN_FURNITURE_SIZE = 20;
+const MIN_OBJECT_HEIGHT = 1;
+const MAX_OBJECT_HEIGHT = 400;
+const MAX_OBJECT_ELEVATION = 400;
 const MAX_HISTORY_LENGTH = 80;
 
 interface LayoutHistorySnapshot {
@@ -184,6 +187,10 @@ function normalizeFurnitureSize(value: number, maxValue: number) {
   return clamp(Math.round(value), MIN_FURNITURE_SIZE, maxValue);
 }
 
+function normalizeFurnitureColor(value: string) {
+  return /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#94a3b8';
+}
+
 function applyFurnitureGeometry(
   roomValue: Room,
   item: PlacedFurniture,
@@ -194,12 +201,22 @@ function applyFurnitureGeometry(
   const maxHeight = item.rotation === 90 ? roomValue.width : roomValue.height;
   const nextWidth = update.width === undefined ? item.width : normalizeFurnitureSize(snapValue(update.width, snapSize), maxWidth);
   const nextHeight = update.height === undefined ? item.height : normalizeFurnitureSize(snapValue(update.height, snapSize), maxHeight);
+  const nextObjectHeight = update.objectHeight === undefined
+    ? item.objectHeight
+    : clamp(Math.round(update.objectHeight), MIN_OBJECT_HEIGHT, MAX_OBJECT_HEIGHT);
+  const nextElevation = update.elevation === undefined
+    ? item.elevation
+    : clamp(Math.round(update.elevation), 0, MAX_OBJECT_ELEVATION);
+  const nextColor = update.color === undefined ? item.color : normalizeFurnitureColor(update.color);
   const nextX = update.x === undefined ? item.x : snapValue(update.x, snapSize);
   const nextY = update.y === undefined ? item.y : snapValue(update.y, snapSize);
   const nextItem = {
     ...item,
     width: nextWidth,
     height: nextHeight,
+    objectHeight: nextObjectHeight,
+    elevation: nextElevation,
+    color: nextColor,
   };
 
   if (nextItem.isWallAttached && (update.x !== undefined || update.y !== undefined)) {
@@ -633,6 +650,13 @@ export function useRoomLayout() {
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
   };
 
+  const applyRoomJson = (nextRoom: Room) => {
+    recordHistory();
+    nextObstacleId = getNextObstacleId(nextRoom);
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
   const beginRoomShapeEdit = () => {
     recordHistory();
   };
@@ -998,6 +1022,7 @@ export function useRoomLayout() {
     resetLayout,
     resizeRoom,
     applyRoomShapePreset,
+    applyRoomJson,
     beginRoomShapeEdit,
     moveRoomPoint,
     addRoomPoint,

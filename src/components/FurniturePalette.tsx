@@ -5,6 +5,10 @@ interface FurniturePaletteProps {
   onAdd: (templateId: string) => void;
 }
 
+function format3DSize(item: FurnitureTemplate) {
+  return `${item.width} × ${item.height} × ${item.objectHeight}`;
+}
+
 export function FurniturePalette({ items, onAdd }: FurniturePaletteProps) {
   return (
     <section className="panel palette-panel">
@@ -27,7 +31,9 @@ export function FurniturePalette({ items, onAdd }: FurniturePaletteProps) {
               {item.isWallAttached && <span className="wall-badge">벽 부착</span>}
             </span>
             <span className="palette-size">
-              {item.width} × {item.height}
+              <span>{format3DSize(item)}</span>
+              <span className="palette-size-label">가로 × 깊이 × 높이</span>
+              {!!item.elevation && <span className="palette-size-label">설치 높이 {item.elevation}</span>}
             </span>
           </button>
         ))}
