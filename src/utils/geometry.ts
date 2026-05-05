@@ -9,14 +9,18 @@ export interface WallSegment {
   end: Position;
 }
 
+function createPoint(id: string, x: number, y: number): Position {
+  return { id, x, y };
+}
+
 export function createRectRoomShape(width: number, height: number): RoomShape {
   return {
     type: 'polygon',
     points: [
-      { x: 0, y: 0 },
-      { x: width, y: 0 },
-      { x: width, y: height },
-      { x: 0, y: height },
+      createPoint('point-0', 0, 0),
+      createPoint('point-1', width, 0),
+      createPoint('point-2', width, height),
+      createPoint('point-3', 0, height),
     ],
     obstacles: [],
   };
@@ -27,12 +31,12 @@ export function createRoomShapeFromPreset(width: number, height: number, preset:
     return {
       type: 'polygon',
       points: [
-        { x: 0, y: 0 },
-        { x: width, y: 0 },
-        { x: width, y: Math.round(height * 0.58) },
-        { x: Math.round(width * 0.62), y: Math.round(height * 0.58) },
-        { x: Math.round(width * 0.62), y: height },
-        { x: 0, y: height },
+        createPoint('point-0', 0, 0),
+        createPoint('point-1', width, 0),
+        createPoint('point-2', width, Math.round(height * 0.58)),
+        createPoint('point-3', Math.round(width * 0.62), Math.round(height * 0.58)),
+        createPoint('point-4', Math.round(width * 0.62), height),
+        createPoint('point-5', 0, height),
       ],
       obstacles,
     };
@@ -42,14 +46,14 @@ export function createRoomShapeFromPreset(width: number, height: number, preset:
     return {
       type: 'polygon',
       points: [
-        { x: 0, y: 0 },
-        { x: Math.round(width * 0.34), y: 0 },
-        { x: Math.round(width * 0.34), y: Math.round(height * 0.14) },
-        { x: Math.round(width * 0.68), y: Math.round(height * 0.14) },
-        { x: Math.round(width * 0.68), y: 0 },
-        { x: width, y: 0 },
-        { x: width, y: height },
-        { x: 0, y: height },
+        createPoint('point-0', 0, 0),
+        createPoint('point-1', Math.round(width * 0.34), 0),
+        createPoint('point-2', Math.round(width * 0.34), Math.round(height * 0.14)),
+        createPoint('point-3', Math.round(width * 0.68), Math.round(height * 0.14)),
+        createPoint('point-4', Math.round(width * 0.68), 0),
+        createPoint('point-5', width, 0),
+        createPoint('point-6', width, height),
+        createPoint('point-7', 0, height),
       ],
       obstacles,
     };
@@ -59,11 +63,11 @@ export function createRoomShapeFromPreset(width: number, height: number, preset:
     return {
       type: 'polygon',
       points: [
-        { x: 0, y: 0 },
-        { x: width, y: 0 },
-        { x: width, y: height },
-        { x: Math.round(width * 0.18), y: height },
-        { x: 0, y: Math.round(height * 0.72) },
+        createPoint('point-0', 0, 0),
+        createPoint('point-1', width, 0),
+        createPoint('point-2', width, height),
+        createPoint('point-3', Math.round(width * 0.18), height),
+        createPoint('point-4', 0, Math.round(height * 0.72)),
       ],
       obstacles,
     };
@@ -95,10 +99,20 @@ export function getRoomWallSegments(room: Room): WallSegment[] {
   const points = getRoomOutlinePoints(room);
 
   return points.map((point, index) => ({
-    id: `wall-${index}`,
+    id: `${point.id ?? `point-${index}`}-${points[(index + 1) % points.length].id ?? `point-${(index + 1) % points.length}`}`,
     start: point,
     end: points[(index + 1) % points.length],
   }));
+}
+
+export function normalizeRoomShapePointIds(shape: RoomShape): RoomShape {
+  return {
+    ...shape,
+    points: shape.points.map((point, index) => ({
+      ...point,
+      id: point.id ?? `point-${index}`,
+    })),
+  };
 }
 
 export function getSegmentAngle(segment: Pick<WallSegment, 'start' | 'end'>) {

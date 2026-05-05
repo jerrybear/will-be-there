@@ -3,7 +3,7 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
-    "outDir": "/private/tmp/will-be-there-storage-tests",
+    "outDir": ".tmp/will-be-there-storage-tests",
     "rootDir": ".",
     "noEmit": false,
     "declaration": false,

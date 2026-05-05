@@ -10,6 +10,7 @@ export interface Size {
 }
 
 export interface Position {
+  id?: string;
   x: number;
   y: number;
 }

@@ -14,7 +14,9 @@ export function CanvasFurnitureItem({ item, isSelected, isOverlapping, onPointer
   const footprint = getRotatedSize(item);
   const isDoor = item.templateId === 'door';
   const normalizedRotation = ((item.rotation % 360) + 360) % 360;
-  const usesFreeRotation = normalizedRotation !== 0 && normalizedRotation !== 90 && normalizedRotation !== 180 && normalizedRotation !== 270;
+  const usesCssRotation = item.isWallAttached && normalizedRotation !== 0;
+  const renderWidth = item.isWallAttached ? item.width : footprint.width;
+  const renderHeight = item.isWallAttached ? item.height : footprint.height;
 
   return (
     <button
@@ -23,11 +25,11 @@ export function CanvasFurnitureItem({ item, isSelected, isOverlapping, onPointer
       style={{
         left: item.x,
         top: item.y,
-        width: footprint.width,
-        height: footprint.height,
+        width: renderWidth,
+        height: renderHeight,
         backgroundColor: item.color,
-        transform: usesFreeRotation ? `rotate(${normalizedRotation}deg)` : undefined,
-        transformOrigin: usesFreeRotation ? 'center center' : undefined,
+        transform: usesCssRotation ? `rotate(${normalizedRotation}deg)` : undefined,
+        transformOrigin: usesCssRotation ? 'center center' : undefined,
       }}
       onPointerDown={(event) => onPointerDown(event, item)}
     >

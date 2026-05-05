@@ -117,4 +117,4 @@ assertEqual(
 
 const nearestWall = getNearestWallProjection(diagonalRoom, { x: 30, y: 400 });
 
-assertEqual(nearestWall?.segment.id, 'wall-3');
+assertEqual(nearestWall?.segment.id, 'point-3-point-4');

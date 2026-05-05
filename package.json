@@ -6,16 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "test:migrations": "tsc -p tsconfig.test.json && node /private/tmp/will-be-there-storage-tests/scripts/layout-storage-migration.test.js",
+    "test:migrations": "tsc -p tsconfig.test.json && cp scripts/test-cjs-package.json .tmp/will-be-there-storage-tests/package.json && node .tmp/will-be-there-storage-tests/scripts/layout-storage-migration.test.js",
     "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@types/three": "^0.184.0",
     "@vitejs/plugin-react": "^4.3.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.10"

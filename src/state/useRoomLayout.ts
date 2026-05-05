@@ -150,9 +150,8 @@ function snapPositionToWall(
     ...item,
     rotation: wallRotation,
   };
-  const footprint = getRotatedSize(rotatedItem);
-  const maxX = Math.max(0, roomValue.width - footprint.width);
-  const maxY = Math.max(0, roomValue.height - footprint.height);
+  const maxX = Math.max(0, roomValue.width - item.width);
+  const maxY = Math.max(0, roomValue.height - item.height);
 
   return {
     item: {
@@ -160,8 +159,8 @@ function snapPositionToWall(
       wallSegmentId: projection.segment.id,
     },
     position: {
-      x: clamp(projection.projection.x - footprint.width / 2, 0, maxX),
-      y: clamp(projection.projection.y - footprint.height / 2, 0, maxY),
+      x: clamp(projection.projection.x - item.width / 2, 0, maxX),
+      y: clamp(projection.projection.y - item.height / 2, 0, maxY),
     },
   };
 }
@@ -649,6 +648,7 @@ export function useRoomLayout() {
           }
 
           return {
+            ...point,
             x: snapRoomCoordinate(x, snapSize, room.width),
             y: snapRoomCoordinate(y, snapSize, room.height),
           };
@@ -672,6 +672,7 @@ export function useRoomLayout() {
         points: [
           ...points.slice(0, insertIndex),
           {
+            id: `point-${Date.now()}`,
             x: snapRoomCoordinate(x, snapSize, room.width),
             y: snapRoomCoordinate(y, snapSize, room.height),
           },

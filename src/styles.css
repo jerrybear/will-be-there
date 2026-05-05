@@ -200,86 +200,23 @@ button {
   min-height: 620px;
 }
 
-.preview-shell {
-  display: grid;
-  gap: 18px;
-  padding: 24px;
-}
-
-.preview-room {
-  position: relative;
-  min-height: 430px;
+.preview-scene {
+  width: 100%;
+  min-height: 540px;
+  height: calc(100% - 72px);
   overflow: hidden;
-  border: 1px solid #d9deea;
-  border-radius: 14px;
-  background: #f8fafc;
-  perspective: 900px;
+  background: #f3f5f9;
 }
 
-.preview-floor {
-  position: absolute;
-  left: 16%;
-  right: 10%;
-  bottom: 13%;
-  height: 42%;
-  transform: rotateX(62deg) rotateZ(-18deg);
-  transform-origin: center bottom;
-  background:
-    linear-gradient(90deg, rgba(148, 163, 184, 0.25) 1px, transparent 1px),
-    linear-gradient(rgba(148, 163, 184, 0.25) 1px, transparent 1px),
-    #ffffff;
-  background-size: 28px 28px;
-  border: 2px solid #94a3b8;
+.preview-scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
 }
 
-.preview-wall {
-  position: absolute;
-  background: rgba(226, 232, 240, 0.92);
-  border: 1px solid #cbd5e1;
-}
-
-.preview-wall-back {
-  left: 20%;
-  right: 14%;
-  top: 19%;
-  height: 28%;
-  transform: skewX(-18deg);
-}
-
-.preview-wall-side {
-  right: 10%;
-  top: 24%;
-  width: 22%;
-  height: 42%;
-  transform: skewY(-22deg);
-  background: rgba(203, 213, 225, 0.82);
-}
-
-.preview-stats {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0;
-}
-
-.preview-stats div {
-  padding: 12px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8faff;
-}
-
-.preview-stats dt {
-  margin: 0 0 4px;
-  color: #5b6473;
-  font-size: 13px;
-}
-
-.preview-stats dd {
-  margin: 0;
-  color: #111827;
-  font-size: 16px;
-  font-weight: 700;
+.preview-scene canvas:active {
+  cursor: grabbing;
 }
 
 .room-shell-wrapper {

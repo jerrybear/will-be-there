@@ -1,6 +1,6 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
 import type { LayoutElementKind, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
-import { createRectRoomShape } from '../utils/geometry';
+import { createRectRoomShape, normalizeRoomShapePointIds } from '../utils/geometry';
 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
@@ -136,16 +136,16 @@ function migrateRoom(room: Room): Room {
   if (room.shape?.type === 'polygon' && Array.isArray(room.shape.points)) {
     return {
       ...room,
-      shape: {
+      shape: normalizeRoomShapePointIds({
         ...room.shape,
         obstacles: Array.isArray(room.shape.obstacles) ? room.shape.obstacles : [],
-      },
+      }),
     };
   }
 
   return {
     ...room,
-    shape: createRectRoomShape(room.width, room.height),
+    shape: normalizeRoomShapePointIds(createRectRoomShape(room.width, room.height)),
   };
 }
 

@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { FurniturePalette } from './components/FurniturePalette';
 import { InspectorPanel } from './components/InspectorPanel';
-import { Preview3DPlaceholder } from './components/Preview3DPlaceholder';
 import { RoomCanvas } from './components/RoomCanvas';
 import { TopBar } from './components/TopBar';
 import { useRoomLayout } from './state/useRoomLayout';
 import type { ViewMode } from './types/layout';
+
+const Preview3DScene = lazy(() =>
+  import('./components/Preview3DScene').then((module) => ({ default: module.Preview3DScene })),
+);
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
@@ -97,7 +100,9 @@ export default function App() {
             onRoomPointDelete={deleteRoomPoint}
           />
         ) : (
-          <Preview3DPlaceholder room={room} items={items} />
+          <Suspense fallback={<section className="panel preview-panel" />}>
+            <Preview3DScene room={room} items={items} />
+          </Suspense>
         )}
         <InspectorPanel
           room={room}
