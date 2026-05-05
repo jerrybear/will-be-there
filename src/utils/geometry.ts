@@ -195,13 +195,17 @@ function pointOnSegment(point: Position, start: Position, end: Position) {
 
   const squaredLength = (end.x - start.x) ** 2 + (end.y - start.y) ** 2;
 
+  if (squaredLength === 0) {
+    return Math.abs(point.x - start.x) < 0.001 && Math.abs(point.y - start.y) < 0.001;
+  }
+
   return dotProduct <= squaredLength;
 }
 
 export function pointInPolygon(point: Position, polygon: Position[]) {
   let isInside = false;
 
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i) {
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const current = polygon[i];
     const previous = polygon[j];
 
@@ -261,4 +265,104 @@ export function getItemPlacementRect(item: Pick<PlacedFurniture, 'width' | 'heig
     width: footprint.width,
     height: footprint.height,
   };
+}
+
+function cross(o: Position, a: Position, b: Position) {
+  return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+}
+
+function onSegmentCollinear(p: Position, q: Position, r: Position) {
+  return (
+    Math.min(p.x, r.x) <= q.x + 0.001 &&
+    q.x - 0.001 <= Math.max(p.x, r.x) &&
+    Math.min(p.y, r.y) <= q.y + 0.001 &&
+    q.y - 0.001 <= Math.max(p.y, r.y)
+  );
+}
+
+/**
+ * Tests whether line segment AB properly intersects line segment CD.
+ * Shared endpoints are NOT considered intersections (adjacent edges).
+ */
+export function segmentsIntersect(a: Position, b: Position, c: Position, d: Position): boolean {
+  // Skip if segments share an endpoint
+  if ((a.x === c.x && a.y === c.y) || (a.x === d.x && a.y === d.y) ||
+      (b.x === c.x && b.y === c.y) || (b.x === d.x && b.y === d.y)) {
+    return false;
+  }
+
+  const d1 = cross(c, d, a);
+  const d2 = cross(c, d, b);
+  const d3 = cross(a, b, c);
+  const d4 = cross(a, b, d);
+
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+
+  if (Math.abs(d1) < 0.001 && onSegmentCollinear(c, a, d)) return true;
+  if (Math.abs(d2) < 0.001 && onSegmentCollinear(c, b, d)) return true;
+  if (Math.abs(d3) < 0.001 && onSegmentCollinear(a, c, b)) return true;
+  if (Math.abs(d4) < 0.001 && onSegmentCollinear(a, d, b)) return true;
+
+  return false;
+}
+
+/**
+ * Returns true if the polygon defined by `points` has any self-intersection
+ * (two non-adjacent edges crossing each other).
+ */
+export function hasPolygonSelfIntersection(points: Position[]): boolean {
+  const n = points.length;
+
+  if (n < 4) {
+    return false;
+  }
+
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 2; j < n; j++) {
+      // Skip adjacent edges (i and j share a vertex when j === i+1, or i===0 && j===n-1)
+      if (i === 0 && j === n - 1) {
+        continue;
+      }
+
+      if (
+        segmentsIntersect(
+          points[i],
+          points[(i + 1) % n],
+          points[j],
+          points[(j + 1) % n],
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Projects a PlacedFurniture item's center onto a wall segment and returns
+ * the distance along the wall from the segment's start point.
+ */
+export function projectItemToWallLocal(
+  segment: WallSegment,
+  item: Pick<PlacedFurniture, 'x' | 'y' | 'width' | 'height' | 'rotation'>,
+): number {
+  const placementRect = getItemPlacementRect(item, item.x, item.y);
+  const centerX = placementRect.x + placementRect.width / 2;
+  const centerY = placementRect.y + placementRect.height / 2;
+  const dx = segment.end.x - segment.start.x;
+  const dy = segment.end.y - segment.start.y;
+  const segmentLength = Math.hypot(dx, dy);
+
+  if (segmentLength === 0) {
+    return 0;
+  }
+
+  const t = ((centerX - segment.start.x) * dx + (centerY - segment.start.y) * dy) / (segmentLength * segmentLength);
+
+  return Math.max(0, Math.min(segmentLength, t * segmentLength));
 }

@@ -298,6 +298,61 @@ button {
   cursor: grabbing;
 }
 
+/* Self-intersection warning styles */
+.room-shape-outline.is-self-intersecting {
+  stroke: #ef4444;
+  stroke-dasharray: 8 4;
+  animation: intersection-pulse 1.2s ease-in-out infinite;
+}
+
+.room-point-handle.is-self-intersecting {
+  fill: #ef4444;
+  stroke: #ffffff;
+}
+
+.room-shape-outline-error {
+  fill: rgba(239, 68, 68, 0.08);
+  stroke: #ef4444;
+  stroke-width: 2;
+  stroke-dasharray: 6 3;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.self-intersection-banner {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  padding: 10px 20px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+  white-space: nowrap;
+  animation: banner-slide-in 0.3s ease-out;
+}
+
+@keyframes intersection-pulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.5; }
+}
+
+@keyframes banner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
 .furniture-item {
   position: absolute;
   display: flex;
@@ -306,7 +361,7 @@ button {
   align-items: flex-start;
   padding: 10px;
   border: 2px solid transparent;
-  border-radius: 14px;
+  border-radius: 0;
   color: #0f172a;
   cursor: grab;
   touch-action: none;
@@ -316,7 +371,7 @@ button {
 
 .furniture-item.is-wall-attached {
   padding: 4px;
-  border-radius: 2px;
+  border-radius: 0;
   justify-content: center;
   align-items: center;
   flex-direction: row;

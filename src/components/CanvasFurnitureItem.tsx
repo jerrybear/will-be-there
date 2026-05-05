@@ -18,13 +18,18 @@ export function CanvasFurnitureItem({ item, isSelected, isOverlapping, onPointer
   const renderWidth = item.isWallAttached ? item.width : footprint.width;
   const renderHeight = item.isWallAttached ? item.height : footprint.height;
 
+  const cx = item.x + footprint.width / 2;
+  const cy = item.y + footprint.height / 2;
+  const renderLeft = item.isWallAttached ? cx - item.width / 2 : item.x;
+  const renderTop = item.isWallAttached ? cy - item.height / 2 : item.y;
+
   return (
     <button
       type="button"
       className={`furniture-item ${isSelected ? 'is-selected' : ''} ${item.isWallAttached ? 'is-wall-attached' : ''} ${isOverlapping ? 'is-overlapping' : ''} ${isDoor ? 'is-door' : ''}`}
       style={{
-        left: item.x,
-        top: item.y,
+        left: renderLeft,
+        top: renderTop,
         width: renderWidth,
         height: renderHeight,
         backgroundColor: item.color,

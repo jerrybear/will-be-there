@@ -9,6 +9,7 @@ interface RoomCanvasProps {
   items: PlacedFurniture[];
   selectedId: string | null;
   isRoomEditingEnabled: boolean;
+  isSelfIntersecting: boolean;
   overlappingItemIds: Set<string>;
   onSelect: (id: string | null) => void;
   onMoveStart: () => void;
@@ -34,6 +35,7 @@ export function RoomCanvas({
   items,
   selectedId,
   isRoomEditingEnabled,
+  isSelfIntersecting,
   overlappingItemIds,
   onSelect,
   onMoveStart,
@@ -245,7 +247,7 @@ export function RoomCanvas({
 
                 return <polygon key={obstacle.id} className="room-obstacle" points={getSvgPoints(obstacle.points)} />;
               })}
-              <polygon className="room-shape-outline" points={roomOutlinePoints} />
+              <polygon className={`room-shape-outline ${isSelfIntersecting ? 'is-self-intersecting' : ''}`} points={roomOutlinePoints} />
               {isRoomEditingEnabled && (
                 <>
                   {roomOutline.map((point, index) => {
@@ -266,7 +268,7 @@ export function RoomCanvas({
                   {roomOutline.map((point, index) => (
                     <circle
                       key={`${index}-${point.x}-${point.y}`}
-                      className="room-point-handle"
+                      className={`room-point-handle ${isSelfIntersecting ? 'is-self-intersecting' : ''}`}
                       cx={point.x}
                       cy={point.y}
                       r={7}
@@ -274,6 +276,11 @@ export function RoomCanvas({
                     />
                   ))}
                 </>
+              )}
+              {isSelfIntersecting && isRoomEditingEnabled && (
+                <g className="self-intersection-warning-overlay">
+                  <polygon className="room-shape-outline-error" points={roomOutlinePoints} />
+                </g>
               )}
             </svg>
 
@@ -289,6 +296,11 @@ export function RoomCanvas({
           </div>
         </div>
       </div>
+      {isSelfIntersecting && isRoomEditingEnabled && (
+        <div className="self-intersection-banner">
+          ⚠️ 벽이 교차하고 있습니다. 꼭짓점을 이동하여 교차를 해소해 주세요.
+        </div>
+      )}
       <div className="zoom-controls">
         <button type="button" onClick={zoomOut}>-</button>
         <span>{Math.round(zoom * 100)}%</span>

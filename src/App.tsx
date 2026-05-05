@@ -24,6 +24,7 @@ export default function App() {
     hasUnsavedChanges,
     hasUnsavedRoomChanges,
     overlappingItemIds,
+    isSelfIntersecting,
     snapSize,
     savedRooms,
     savedLayouts,
@@ -91,6 +92,7 @@ export default function App() {
             items={items}
             selectedId={selectedId}
             isRoomEditingEnabled={isRoomEditingEnabled}
+            isSelfIntersecting={isSelfIntersecting}
             overlappingItemIds={overlappingItemIds}
             onSelect={selectFurniture}
             onMoveStart={beginFurnitureMove}
