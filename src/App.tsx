@@ -9,6 +9,7 @@ import type { ViewMode } from './types/layout';
 
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
+  const [isRoomEditingEnabled, setIsRoomEditingEnabled] = useState(false);
   const {
     room,
     catalog,
@@ -16,9 +17,12 @@ export default function App() {
     selectedId,
     selectedItem,
     currentLayout,
+    currentRoom,
     hasUnsavedChanges,
+    hasUnsavedRoomChanges,
     overlappingItemIds,
     snapSize,
+    savedRooms,
     savedLayouts,
     canUndo,
     canRedo,
@@ -35,11 +39,24 @@ export default function App() {
     setSnapSize,
     resetLayout,
     resizeRoom,
+    applyRoomShapePreset,
+    beginRoomShapeEdit,
+    moveRoomPoint,
+    addRoomPoint,
+    deleteRoomPoint,
+    addPillar,
+    deleteRoomObstacle,
+    updateRoomObstacle,
+    saveRoom,
+    loadRoom,
+    deleteRoom,
+    updateCurrentRoom,
     saveLayout,
     loadLayout,
     deleteLayout,
     updateLayoutMeta,
     updateCurrentLayout,
+    currentRoomId,
     undoLayoutChange,
     redoLayoutChange,
   } = useRoomLayout();
@@ -69,10 +86,15 @@ export default function App() {
             room={room}
             items={items}
             selectedId={selectedId}
+            isRoomEditingEnabled={isRoomEditingEnabled}
             overlappingItemIds={overlappingItemIds}
             onSelect={selectFurniture}
             onMoveStart={beginFurnitureMove}
             onMove={moveFurniture}
+            onRoomPointMoveStart={beginRoomShapeEdit}
+            onRoomPointMove={moveRoomPoint}
+            onRoomPointAdd={addRoomPoint}
+            onRoomPointDelete={deleteRoomPoint}
           />
         ) : (
           <Preview3DPlaceholder room={room} items={items} />
@@ -81,19 +103,33 @@ export default function App() {
           room={room}
           item={selectedItem}
           isOverlapping={selectedItem ? overlappingItemIds.has(selectedItem.id) : false}
+          isRoomEditingEnabled={isRoomEditingEnabled}
           snapSize={snapSize}
+          savedRooms={savedRooms}
           savedLayouts={savedLayouts}
+          currentRoom={currentRoom}
           onRotate={rotateFurniture}
           onRename={renameFurniture}
           onUpdateDoorSwing={updateDoorSwing}
           onDuplicate={duplicateFurniture}
           onDeleteFurniture={deleteFurniture}
+          onRoomEditingChange={setIsRoomEditingEnabled}
           onUpdateFurniture={updateFurnitureGeometry}
           onSnapSizeChange={setSnapSize}
           onResizeRoom={resizeRoom}
+          onApplyRoomShapePreset={applyRoomShapePreset}
+          onAddPillar={addPillar}
+          onDeleteRoomObstacle={deleteRoomObstacle}
+          onUpdateRoomObstacle={updateRoomObstacle}
+          onSaveRoom={saveRoom}
+          onLoadRoom={loadRoom}
+          onDeleteRoom={deleteRoom}
+          onUpdateCurrentRoom={updateCurrentRoom}
           onSave={saveLayout}
+          currentRoomId={currentRoomId}
           currentLayoutId={currentLayout?.id ?? null}
           hasUnsavedChanges={hasUnsavedChanges}
+          hasUnsavedRoomChanges={hasUnsavedRoomChanges}
           onUpdateCurrentLayout={updateCurrentLayout}
         />
       </main>

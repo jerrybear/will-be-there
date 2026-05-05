@@ -2,27 +2,44 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import type { FurnitureGeometryUpdate, PlacedFurniture } from '../types/layout';
 import type { Room } from '../types/layout';
+import type { RoomObstacle, RoomShapePreset } from '../types/layout';
 import type { SavedLayout } from '../types/layout';
+import type { SavedRoom } from '../types/layout';
 import type { SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
+import { getRoomShape } from '../utils/geometry';
 
 interface InspectorPanelProps {
   room: Room;
   item: PlacedFurniture | null;
   isOverlapping: boolean;
+  isRoomEditingEnabled: boolean;
   snapSize: SnapSize;
+  savedRooms: SavedRoom[];
   savedLayouts: SavedLayout[];
+  currentRoom: SavedRoom | null;
   onRotate: (id: string) => void;
   onRename: (id: string, label: string) => void;
   onUpdateDoorSwing: (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => void;
   onDuplicate: (id: string) => void;
   onDeleteFurniture: (id: string) => void;
+  onRoomEditingChange: (enabled: boolean) => void;
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
   onSnapSizeChange: (snapSize: SnapSize) => void;
   onResizeRoom: (width: number, height: number) => void;
+  onApplyRoomShapePreset: (preset: RoomShapePreset) => void;
+  onAddPillar: () => void;
+  onDeleteRoomObstacle: (id: string) => void;
+  onUpdateRoomObstacle: (id: string, update: Partial<Extract<RoomObstacle, { type: 'rect' }>>) => void;
+  onSaveRoom: (name: string, memo: string) => string | null;
+  onLoadRoom: (id: string) => void;
+  onDeleteRoom: (id: string) => void;
+  onUpdateCurrentRoom: () => void;
   onSave: (name: string, memo: string) => void;
+  currentRoomId: string | null;
   currentLayoutId: string | null;
   hasUnsavedChanges: boolean;
+  hasUnsavedRoomChanges: boolean;
   onUpdateCurrentLayout: () => void;
 }
 
@@ -58,23 +75,39 @@ export function InspectorPanel({
   room,
   item,
   isOverlapping,
+  isRoomEditingEnabled,
   snapSize,
+  savedRooms,
   savedLayouts,
+  currentRoom,
   onRotate,
   onRename,
   onUpdateDoorSwing,
   onDuplicate,
   onDeleteFurniture,
+  onRoomEditingChange,
   onUpdateFurniture,
   onSnapSizeChange,
   onResizeRoom,
+  onApplyRoomShapePreset,
+  onAddPillar,
+  onDeleteRoomObstacle,
+  onUpdateRoomObstacle,
+  onSaveRoom,
+  onLoadRoom,
+  onDeleteRoom,
+  onUpdateCurrentRoom,
   onSave,
+  currentRoomId,
   currentLayoutId,
   hasUnsavedChanges,
+  hasUnsavedRoomChanges,
   onUpdateCurrentLayout,
 }: InspectorPanelProps) {
   const [layoutName, setLayoutName] = useState('');
   const [layoutMemo, setLayoutMemo] = useState('');
+  const [roomName, setRoomName] = useState('');
+  const [roomMemo, setRoomMemo] = useState('');
   const [roomDraft, setRoomDraft] = useState({
     width: String(room.width),
     height: String(room.height),
@@ -122,6 +155,16 @@ export function InspectorPanel({
     setLayoutMemo('');
   };
 
+  const handleRoomSave = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const savedRoomId = onSaveRoom(roomName, roomMemo);
+
+    if (savedRoomId) {
+      setRoomName('');
+      setRoomMemo('');
+    }
+  };
+
   const draftWidth = Number(roomDraft.width);
   const draftHeight = Number(roomDraft.height);
   const hasValidRoomDraft = Number.isFinite(draftWidth) && Number.isFinite(draftHeight) && draftWidth > 0 && draftHeight > 0;
@@ -164,6 +207,22 @@ export function InspectorPanel({
     });
   };
 
+  const handleObstacleApply = (event: FormEvent<HTMLFormElement>, id: string) => {
+    event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+    const x = Number(formData.get('x'));
+    const y = Number(formData.get('y'));
+    const width = Number(formData.get('width'));
+    const height = Number(formData.get('height'));
+
+    if (![x, y, width, height].every(Number.isFinite) || width <= 0 || height <= 0) {
+      return;
+    }
+
+    onUpdateRoomObstacle(id, { x, y, width, height });
+  };
+
   const handleRename = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -189,6 +248,70 @@ export function InspectorPanel({
   );
 
   const currentLayout = savedLayouts.find((l) => l.id === currentLayoutId);
+  const roomShape = getRoomShape(room);
+  const roomLayouts = currentRoomId ? savedLayouts.filter((layout) => layout.roomId === currentRoomId) : savedLayouts;
+
+  const savedRoomsSection = (
+    <div className="saved-layouts room-library">
+      {currentRoomId && currentRoom ? (
+        <div className="active-layout-section">
+          <h3>
+            현재 방: {currentRoom.name}
+            {hasUnsavedRoomChanges ? ' · 수정됨' : ''}
+          </h3>
+          {currentRoom.memo && <p className="layout-memo">{currentRoom.memo}</p>}
+          <button type="button" className="primary-button update-button" onClick={onUpdateCurrentRoom} disabled={!hasUnsavedRoomChanges}>
+            현재 방에 덮어쓰기
+          </button>
+          <hr className="section-divider" />
+          <h3>새 방으로 저장</h3>
+        </div>
+      ) : (
+        <h3>방 저장</h3>
+      )}
+      <form className="save-form" onSubmit={handleRoomSave}>
+        <input
+          type="text"
+          value={roomName}
+          onChange={(event) => setRoomName(event.target.value)}
+          placeholder="방 이름"
+          aria-label="방 이름"
+        />
+        <textarea
+          value={roomMemo}
+          onChange={(event) => setRoomMemo(event.target.value)}
+          placeholder="방 메모 (선택 사항)"
+          aria-label="방 메모"
+          rows={2}
+          className="memo-input"
+        />
+        <button type="submit" className="ghost-button compact-button" disabled={!roomName.trim()}>
+          방 저장
+        </button>
+      </form>
+      {savedRooms.length > 0 && (
+        <div className="saved-layout-list">
+          {savedRooms.map((savedRoom) => (
+            <article key={savedRoom.id} className={`saved-layout-card ${savedRoom.id === currentRoomId ? 'is-active' : ''}`}>
+              <div className="layout-info">
+                <strong>{savedRoom.name}</strong>
+                {savedRoom.memo && <p className="layout-memo">{savedRoom.memo}</p>}
+                <span>{formatSavedTime(savedRoom.updatedAt)}</span>
+              </div>
+              <div className="saved-layout-actions">
+                <button type="button" className="ghost-button compact-button" onClick={() => onLoadRoom(savedRoom.id)}>
+                  불러오기
+                </button>
+                <button type="button" className="ghost-button compact-button danger-button" onClick={() => onDeleteRoom(savedRoom.id)}>
+                  삭제
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const savedLayoutsSection = (
     <div className="saved-layouts">
@@ -229,7 +352,7 @@ export function InspectorPanel({
         </div>
       ) : (
         <div className="new-layout-section">
-          <h3>새 도면 저장</h3>
+          <h3>{currentRoom ? `${currentRoom.name} 도면 저장` : '새 도면 저장'}</h3>
           <form className="save-form" onSubmit={handleSave}>
             <input
               type="text"
@@ -250,6 +373,22 @@ export function InspectorPanel({
               저장
             </button>
           </form>
+        </div>
+      )}
+      {roomLayouts.length > 0 && (
+        <div className="saved-layout-list">
+          {roomLayouts.map((layout) => (
+            <article key={layout.id} className={`saved-layout-card ${layout.id === currentLayoutId ? 'is-active' : ''}`}>
+              <div className="layout-info">
+                <strong>
+                  {layout.name}
+                  {layout.id === currentLayoutId && hasUnsavedChanges ? ' · 수정됨' : ''}
+                </strong>
+                {layout.memo && <p className="layout-memo">{layout.memo}</p>}
+                <span>{layout.items.length}개 요소 · {formatSavedTime(layout.updatedAt)}</span>
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </div>
@@ -291,6 +430,87 @@ export function InspectorPanel({
     </div>
   );
 
+  const roomShapeSection = (
+    <div className="room-shape-editor">
+      <h3>방 형태</h3>
+      <label className="toggle-label room-edit-toggle">
+        <input
+          type="checkbox"
+          checked={isRoomEditingEnabled}
+          onChange={(event) => onRoomEditingChange(event.target.checked)}
+        />
+        <span>방 편집</span>
+      </label>
+      {isRoomEditingEnabled && (
+        <>
+          <div className="shape-preset-grid">
+            <button type="button" className="ghost-button compact-button" onClick={() => onApplyRoomShapePreset('rect')}>
+              직사각형
+            </button>
+            <button type="button" className="ghost-button compact-button" onClick={() => onApplyRoomShapePreset('l-shape')}>
+              ㄱ자
+            </button>
+            <button type="button" className="ghost-button compact-button" onClick={() => onApplyRoomShapePreset('bay')}>
+              튀어나온 면
+            </button>
+            <button type="button" className="ghost-button compact-button" onClick={() => onApplyRoomShapePreset('diagonal')}>
+              사선
+            </button>
+          </div>
+          <button type="button" className="ghost-button compact-button" onClick={onAddPillar}>
+            기둥 추가
+          </button>
+        </>
+      )}
+      {roomShape.obstacles.length > 0 ? (
+        <div className="obstacle-list">
+          {roomShape.obstacles.map((obstacle) => (
+            <form key={obstacle.id} className="obstacle-row" onSubmit={(event) => handleObstacleApply(event, obstacle.id)}>
+              <div className="obstacle-title">
+                <strong>{obstacle.label}</strong>
+                {obstacle.type === 'rect' && (
+                  <div className="obstacle-fields">
+                    <label>
+                      <span>x</span>
+                      <input name="x" type="number" min="0" step="1" defaultValue={Math.round(obstacle.x)} />
+                    </label>
+                    <label>
+                      <span>y</span>
+                      <input name="y" type="number" min="0" step="1" defaultValue={Math.round(obstacle.y)} />
+                    </label>
+                    <label>
+                      <span>폭</span>
+                      <input name="width" type="number" min="20" step="1" defaultValue={Math.round(obstacle.width)} />
+                    </label>
+                    <label>
+                      <span>높이</span>
+                      <input name="height" type="number" min="20" step="1" defaultValue={Math.round(obstacle.height)} />
+                    </label>
+                  </div>
+                )}
+              </div>
+              <div className="obstacle-actions">
+                <button type="submit" className="ghost-button compact-button" disabled={!isRoomEditingEnabled}>
+                  적용
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button compact-button danger-button"
+                  onClick={() => onDeleteRoomObstacle(obstacle.id)}
+                  disabled={!isRoomEditingEnabled}
+                >
+                  삭제
+                </button>
+              </div>
+            </form>
+          ))}
+        </div>
+      ) : (
+        <p>방 안의 배치 불가 영역이 없습니다.</p>
+      )}
+    </div>
+  );
+
   if (!item) {
     return (
       <section className="panel inspector-panel">
@@ -300,6 +520,8 @@ export function InspectorPanel({
         </div>
         {snapSection}
         {roomSizeSection}
+        {roomShapeSection}
+        {savedRoomsSection}
         <div className="empty-state">아직 선택된 가구가 없습니다.</div>
         {savedLayoutsSection}
       </section>
@@ -511,6 +733,8 @@ export function InspectorPanel({
         </button>
       </div>
       {roomSizeSection}
+      {roomShapeSection}
+      {savedRoomsSection}
       {savedLayoutsSection}
     </section>
   );

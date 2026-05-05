@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PlacedFurniture, Room } from '../types/layout';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
+import { getRoomOutlinePoints, getRoomShape, getSvgPoints } from '../utils/geometry';
 import { CanvasFurnitureItem } from './CanvasFurnitureItem';
 
 interface RoomCanvasProps {
   room: Room;
   items: PlacedFurniture[];
   selectedId: string | null;
+  isRoomEditingEnabled: boolean;
   overlappingItemIds: Set<string>;
   onSelect: (id: string | null) => void;
   onMoveStart: () => void;
   onMove: (id: string, x: number, y: number) => void;
+  onRoomPointMoveStart: () => void;
+  onRoomPointMove: (index: number, x: number, y: number) => void;
+  onRoomPointAdd: (afterIndex: number, x: number, y: number) => void;
+  onRoomPointDelete: (index: number) => void;
 }
 
 interface DragState {
@@ -19,9 +25,30 @@ interface DragState {
   pointerOffsetY: number;
 }
 
-export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSelect, onMoveStart, onMove }: RoomCanvasProps) {
+interface PointDragState {
+  index: number;
+}
+
+export function RoomCanvas({
+  room,
+  items,
+  selectedId,
+  isRoomEditingEnabled,
+  overlappingItemIds,
+  onSelect,
+  onMoveStart,
+  onMove,
+  onRoomPointMoveStart,
+  onRoomPointMove,
+  onRoomPointAdd,
+  onRoomPointDelete,
+}: RoomCanvasProps) {
   const roomRef = useRef<HTMLDivElement | null>(null);
   const [dragState, setDragState] = useState<DragState | null>(null);
+  const [pointDragState, setPointDragState] = useState<PointDragState | null>(null);
+  const roomOutline = getRoomOutlinePoints(room);
+  const roomOutlinePoints = getSvgPoints(getRoomOutlinePoints(room));
+  const roomShape = getRoomShape(room);
   const {
     shellRef,
     zoom,
@@ -67,6 +94,38 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
     };
   }, [dragState, onMove, zoom]);
 
+  useEffect(() => {
+    if (!pointDragState) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const roomElement = roomRef.current;
+
+      if (!roomElement) {
+        return;
+      }
+
+      const roomRect = roomElement.getBoundingClientRect();
+      const nextX = (event.clientX - roomRect.left) / zoom;
+      const nextY = (event.clientY - roomRect.top) / zoom;
+
+      onRoomPointMove(pointDragState.index, nextX, nextY);
+    };
+
+    const handlePointerUp = () => {
+      setPointDragState(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [onRoomPointMove, pointDragState, zoom]);
+
   const handleShellPointerDown = (e: React.PointerEvent) => {
     const startedPan = beginPan(e);
 
@@ -104,6 +163,44 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
     });
   };
 
+  const handleRoomPointPointerDown = (event: React.PointerEvent<SVGCircleElement>, index: number) => {
+    if (!isRoomEditingEnabled || event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(null);
+
+    if (event.altKey) {
+      onRoomPointDelete(index);
+      return;
+    }
+
+    onRoomPointMoveStart();
+    setPointDragState({ index });
+  };
+
+  const handleWallPointerDown = (event: React.PointerEvent<SVGLineElement>, afterIndex: number) => {
+    if (!isRoomEditingEnabled || event.button !== 0 || event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) {
+      return;
+    }
+
+    const roomElement = roomRef.current;
+
+    if (!roomElement) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(null);
+
+    const roomRect = roomElement.getBoundingClientRect();
+    const nextX = (event.clientX - roomRect.left) / zoom;
+    const nextY = (event.clientY - roomRect.top) / zoom;
+
+    onRoomPointAdd(afterIndex, nextX, nextY);
+  };
+
   return (
     <section className="panel canvas-panel">
       <div className="panel-header">
@@ -130,19 +227,67 @@ export function RoomCanvas({ room, items, selectedId, overlappingItemIds, onSele
               transformOrigin: '0 0',
             }}
           >
-            <div className="room-label">크기 조절 가능한 방</div>
+            <svg className="room-shape-layer" viewBox={`0 0 ${room.width} ${room.height}`} aria-hidden="true">
+              <polygon className="room-shape-fill" points={roomOutlinePoints} />
+              {roomShape.obstacles.map((obstacle) => {
+                if (obstacle.type === 'rect') {
+                  return (
+                    <rect
+                      key={obstacle.id}
+                      className="room-obstacle"
+                      x={obstacle.x}
+                      y={obstacle.y}
+                      width={obstacle.width}
+                      height={obstacle.height}
+                    />
+                  );
+                }
 
-          {items.map((item) => (
-            <CanvasFurnitureItem
-              key={item.id}
-              item={item}
-              isSelected={selectedId === item.id}
-              isOverlapping={overlappingItemIds.has(item.id)}
-              onPointerDown={handleItemPointerDown}
-            />
-          ))}
+                return <polygon key={obstacle.id} className="room-obstacle" points={getSvgPoints(obstacle.points)} />;
+              })}
+              <polygon className="room-shape-outline" points={roomOutlinePoints} />
+              {isRoomEditingEnabled && (
+                <>
+                  {roomOutline.map((point, index) => {
+                    const nextPoint = roomOutline[(index + 1) % roomOutline.length];
+
+                    return (
+                      <line
+                        key={`wall-hit-${index}`}
+                        className="room-wall-hit-area"
+                        x1={point.x}
+                        y1={point.y}
+                        x2={nextPoint.x}
+                        y2={nextPoint.y}
+                        onPointerDown={(event) => handleWallPointerDown(event, index)}
+                      />
+                    );
+                  })}
+                  {roomOutline.map((point, index) => (
+                    <circle
+                      key={`${index}-${point.x}-${point.y}`}
+                      className="room-point-handle"
+                      cx={point.x}
+                      cy={point.y}
+                      r={7}
+                      onPointerDown={(event) => handleRoomPointPointerDown(event, index)}
+                    />
+                  ))}
+                </>
+              )}
+            </svg>
+
+            {items.map((item) => (
+              <CanvasFurnitureItem
+                key={item.id}
+                item={item}
+                isSelected={selectedId === item.id}
+                isOverlapping={overlappingItemIds.has(item.id)}
+                onPointerDown={handleItemPointerDown}
+              />
+            ))}
+          </div>
         </div>
-      </div>
       </div>
       <div className="zoom-controls">
         <button type="button" onClick={zoomOut}>-</button>

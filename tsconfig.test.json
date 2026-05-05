@@ -14,6 +14,7 @@
     "scripts/**/*.ts",
     "src/data/furnitureCatalog.ts",
     "src/state/layoutStorage.ts",
-    "src/types/layout.ts"
+    "src/types/layout.ts",
+    "src/utils/geometry.ts"
   ]
 }

@@ -1,13 +1,22 @@
 import { useMemo, useState } from 'react';
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { FurnitureGeometryUpdate, PlacedFurniture, Room, Rotation, SavedLayout, SnapSize } from '../types/layout';
+import type { FurnitureGeometryUpdate, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
-import { loadSavedLayouts, persistSavedLayouts } from './layoutStorage';
+import {
+  createRectRoom,
+  createRoomShapeFromPreset,
+  getItemPlacementRect,
+  getNearestWallProjection,
+  getRoomShape,
+  getSegmentAngle,
+  isRectInsideRoom,
+  normalizeRotation,
+  rectFromItem,
+  rectsOverlap,
+} from '../utils/geometry';
+import { loadWorkspaceState, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
 
-const DEFAULT_ROOM: Room = {
-  width: 720,
-  height: 480,
-};
+const DEFAULT_ROOM: Room = createRectRoom(720, 480);
 
 const MIN_ROOM_WIDTH = 240;
 const MIN_ROOM_HEIGHT = 180;
@@ -20,12 +29,12 @@ interface LayoutHistorySnapshot {
   room: Room;
   items: PlacedFurniture[];
   selectedId: string | null;
+  currentRoomId: string | null;
   currentLayoutId: string | null;
 }
 
-type WallSide = 'left' | 'right' | 'top' | 'bottom';
-
 let nextFurnitureId = 1;
+let nextObstacleId = 1;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -37,6 +46,10 @@ function snapValue(value: number, snapSize: SnapSize) {
   }
 
   return Math.round(value / snapSize) * snapSize;
+}
+
+function snapRoomCoordinate(value: number, snapSize: SnapSize, maxValue: number) {
+  return clamp(snapValue(Math.round(value), snapSize), 0, maxValue);
 }
 
 function clampPosition(roomValue: Room, item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation' | 'isWallAttached'>, x: number, y: number) {
@@ -66,63 +79,105 @@ function clampPosition(roomValue: Room, item: Pick<PlacedFurniture, 'width' | 'h
     }
   }
 
+  if (!isRectInsideRoom(roomValue, getItemPlacementRect(item, clampedX, clampedY))) {
+    const fallbackPosition = findNearestValidPosition(roomValue, item, clampedX, clampedY);
+
+    if (fallbackPosition) {
+      return fallbackPosition;
+    }
+  }
+
   return {
     x: clampedX,
     y: clampedY,
   };
 }
 
-function getNearestWallSide(
+function findNearestValidPosition(
   roomValue: Room,
   item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation'>,
   x: number,
   y: number,
-): WallSide {
-  const footprint = getRotatedSize(item);
-  const maxX = Math.max(0, roomValue.width - footprint.width);
-  const maxY = Math.max(0, roomValue.height - footprint.height);
-  const clampedX = clamp(x, 0, maxX);
-  const clampedY = clamp(y, 0, maxY);
-  const distances: Array<{ side: WallSide; value: number }> = [
-    { side: 'left', value: clampedX },
-    { side: 'right', value: maxX - clampedX },
-    { side: 'top', value: clampedY },
-    { side: 'bottom', value: maxY - clampedY },
-  ];
-
-  return distances.reduce((nearest, current) => (current.value < nearest.value ? current : nearest)).side;
-}
-
-function getWallRotation(side: WallSide): Rotation {
-  return side === 'left' || side === 'right' ? 90 : 0;
-}
-
-function clampPositionToWall(
-  roomValue: Room,
-  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation'>,
-  x: number,
-  y: number,
-  side: WallSide,
 ) {
   const footprint = getRotatedSize(item);
   const maxX = Math.max(0, roomValue.width - footprint.width);
   const maxY = Math.max(0, roomValue.height - footprint.height);
-  let clampedX = clamp(x, 0, maxX);
-  let clampedY = clamp(y, 0, maxY);
+  const startX = clamp(x, 0, maxX);
+  const startY = clamp(y, 0, maxY);
+  const searchStep = 10;
+  const maxRadius = Math.max(roomValue.width, roomValue.height);
 
-  if (side === 'left') {
-    clampedX = 0;
-  } else if (side === 'right') {
-    clampedX = maxX;
-  } else if (side === 'top') {
-    clampedY = 0;
-  } else {
-    clampedY = maxY;
+  for (let radius = 0; radius <= maxRadius; radius += searchStep) {
+    for (let dx = -radius; dx <= radius; dx += searchStep) {
+      for (let dy = -radius; dy <= radius; dy += searchStep) {
+        if (Math.abs(dx) !== radius && Math.abs(dy) !== radius) {
+          continue;
+        }
+
+        const candidateX = clamp(startX + dx, 0, maxX);
+        const candidateY = clamp(startY + dy, 0, maxY);
+
+        if (isRectInsideRoom(roomValue, getItemPlacementRect(item, candidateX, candidateY))) {
+          return {
+            x: candidateX,
+            y: candidateY,
+          };
+        }
+      }
+    }
   }
 
+  return null;
+}
+
+function snapPositionToWall(
+  roomValue: Room,
+  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation' | 'wallRotationOffset'>,
+  x: number,
+  y: number,
+) {
+  const projection = getNearestWallProjection(roomValue, { x, y });
+
+  if (!projection) {
+    return {
+      item,
+      position: { x, y },
+    };
+  }
+
+  const wallRotation = normalizeRotation(getSegmentAngle(projection.segment) + (item.wallRotationOffset ?? 0));
+  const rotatedItem = {
+    ...item,
+    rotation: wallRotation,
+  };
+  const footprint = getRotatedSize(rotatedItem);
+  const maxX = Math.max(0, roomValue.width - footprint.width);
+  const maxY = Math.max(0, roomValue.height - footprint.height);
+
   return {
-    x: clampedX,
-    y: clampedY,
+    item: {
+      ...rotatedItem,
+      wallSegmentId: projection.segment.id,
+    },
+    position: {
+      x: clamp(projection.projection.x - footprint.width / 2, 0, maxX),
+      y: clamp(projection.projection.y - footprint.height / 2, 0, maxY),
+    },
+  };
+}
+
+function clampPositionToRoomBounds(
+  roomValue: Room,
+  item: Pick<PlacedFurniture, 'width' | 'height'>,
+  x: number,
+  y: number,
+) {
+  const maxX = Math.max(0, roomValue.width - item.width);
+  const maxY = Math.max(0, roomValue.height - item.height);
+
+  return {
+    x: clamp(x, 0, maxX),
+    y: clamp(y, 0, maxY),
   };
 }
 
@@ -149,16 +204,12 @@ function applyFurnitureGeometry(
   };
 
   if (nextItem.isWallAttached && (update.x !== undefined || update.y !== undefined)) {
-    const wallSide = getNearestWallSide(roomValue, nextItem, nextX, nextY);
-    const rotatedItem = {
-      ...nextItem,
-      rotation: getWallRotation(wallSide),
-    };
-    const position = clampPositionToWall(roomValue, rotatedItem, nextX, nextY, wallSide);
+    const wallPlacement = snapPositionToWall(roomValue, nextItem, nextX, nextY);
 
     return {
-      ...rotatedItem,
-      ...position,
+      ...nextItem,
+      ...wallPlacement.item,
+      ...wallPlacement.position,
     };
   }
 
@@ -171,10 +222,7 @@ function applyFurnitureGeometry(
 }
 
 function normalizeRoomSize(width: number, height: number): Room {
-  return {
-    width: clamp(Math.round(width), MIN_ROOM_WIDTH, MAX_ROOM_WIDTH),
-    height: clamp(Math.round(height), MIN_ROOM_HEIGHT, MAX_ROOM_HEIGHT),
-  };
+  return createRectRoom(clamp(Math.round(width), MIN_ROOM_WIDTH, MAX_ROOM_WIDTH), clamp(Math.round(height), MIN_ROOM_HEIGHT, MAX_ROOM_HEIGHT));
 }
 
 function clampItemsToRoom(roomValue: Room, itemsValue: PlacedFurniture[]) {
@@ -226,9 +274,33 @@ function createSavedLayoutId() {
   return `layout-${Date.now()}`;
 }
 
+function createSavedRoomId() {
+  return `room-${Date.now()}`;
+}
+
+function createObstacleId() {
+  const id = nextObstacleId;
+  nextObstacleId += 1;
+  return `obstacle-${id}`;
+}
+
 function getNextFurnitureId(itemsValue: PlacedFurniture[]) {
   const maxId = itemsValue.reduce((maxValue, item) => {
     const match = item.id.match(/^furniture-(\d+)$/);
+
+    if (!match) {
+      return maxValue;
+    }
+
+    return Math.max(maxValue, Number(match[1]));
+  }, 0);
+
+  return maxId + 1;
+}
+
+function getNextObstacleId(roomValue: Room) {
+  const maxId = getRoomShape(roomValue).obstacles.reduce((maxValue, obstacle) => {
+    const match = obstacle.id.match(/^obstacle-(\d+)$/);
 
     if (!match) {
       return maxValue;
@@ -248,11 +320,14 @@ function normalizeLayoutForComparison(roomValue: Room, itemsValue: PlacedFurnitu
 }
 
 export function useRoomLayout() {
+  const initialWorkspaceState = useMemo(() => loadWorkspaceState(), []);
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
-  const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => loadSavedLayouts());
+  const [savedRooms, setSavedRooms] = useState<SavedRoom[]>(() => initialWorkspaceState.rooms);
+  const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => initialWorkspaceState.layouts);
+  const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
   const [pastLayouts, setPastLayouts] = useState<LayoutHistorySnapshot[]>([]);
   const [futureLayouts, setFutureLayouts] = useState<LayoutHistorySnapshot[]>([]);
@@ -267,13 +342,26 @@ export function useRoomLayout() {
     [currentLayoutId, savedLayouts],
   );
 
+  const currentRoom = useMemo(
+    () => savedRooms.find((savedRoom) => savedRoom.id === currentRoomId) ?? null,
+    [currentRoomId, savedRooms],
+  );
+
   const hasUnsavedChanges = useMemo(() => {
     if (!currentLayout) {
-      return items.length > 0 || room.width !== DEFAULT_ROOM.width || room.height !== DEFAULT_ROOM.height;
+      return items.length > 0;
     }
 
-    return normalizeLayoutForComparison(room, items) !== normalizeLayoutForComparison(currentLayout.room, currentLayout.items);
-  }, [currentLayout, items, room]);
+    return JSON.stringify(items) !== JSON.stringify(currentLayout.items) || currentLayout.roomId !== currentRoomId;
+  }, [currentLayout, currentRoomId, items]);
+
+  const hasUnsavedRoomChanges = useMemo(() => {
+    if (!currentRoom) {
+      return normalizeLayoutForComparison(room, []) !== normalizeLayoutForComparison(DEFAULT_ROOM, []);
+    }
+
+    return normalizeLayoutForComparison(room, []) !== normalizeLayoutForComparison(currentRoom.room, []);
+  }, [currentRoom, room]);
 
   const overlappingItemIds = useMemo(() => {
     const ids = new Set<string>();
@@ -285,28 +373,18 @@ export function useRoomLayout() {
 
         if (a.isWallAttached && b.isWallAttached) continue;
 
-        const sizeA = getRotatedSize(a);
-        const sizeB = getRotatedSize(b);
-        
-        const boundsA = { x: a.x, y: a.y, width: sizeA.width, height: sizeA.height };
-        const boundsB = { x: b.x, y: b.y, width: sizeB.width, height: sizeB.height };
+        const boundsA = rectFromItem(a);
+        const boundsB = rectFromItem(b);
 
-        const checkOverlap = (b1: typeof boundsA, b2: typeof boundsA) => {
-          return b1.x < b2.x + b2.width &&
-                 b1.x + b1.width > b2.x &&
-                 b1.y < b2.y + b2.height &&
-                 b1.y + b1.height > b2.y;
-        };
-
-        const overlap = checkOverlap(boundsA, boundsB);
+        const overlap = rectsOverlap(boundsA, boundsB);
         let swingOverlap = false;
 
         if (!overlap) {
           const swingA = getSwingBounds(a);
-          if (swingA && checkOverlap(swingA, boundsB)) swingOverlap = true;
+          if (swingA && rectsOverlap(swingA, boundsB)) swingOverlap = true;
           
           const swingB = getSwingBounds(b);
-          if (swingB && checkOverlap(swingB, boundsA)) swingOverlap = true;
+          if (swingB && rectsOverlap(swingB, boundsA)) swingOverlap = true;
         }
 
         if (overlap || swingOverlap) {
@@ -322,14 +400,17 @@ export function useRoomLayout() {
     room,
     items,
     selectedId,
+    currentRoomId,
     currentLayoutId,
   });
 
   const restoreLayoutSnapshot = (snapshot: LayoutHistorySnapshot) => {
     nextFurnitureId = getNextFurnitureId(snapshot.items);
+    nextObstacleId = getNextObstacleId(snapshot.room);
     setRoom(snapshot.room);
     setItems(snapshot.items);
     setSelectedId(snapshot.selectedId);
+    setCurrentRoomId(snapshot.currentRoomId);
     setCurrentLayoutId(snapshot.currentLayoutId);
   };
 
@@ -464,14 +545,11 @@ export function useRoomLayout() {
           return item;
         }
 
-        const nextRotation: Rotation = item.rotation === 0 ? 90 : 0;
-        const nextItem = { ...item, rotation: nextRotation };
-        const position = clampPosition(room, nextItem, item.x, item.y);
+        const wallRotationOffset = item.isWallAttached ? (item.wallRotationOffset === 90 ? 0 : 90) : item.wallRotationOffset;
+        const nextRotation: Rotation = item.isWallAttached ? normalizeRotation(item.rotation + 90) : item.rotation === 0 ? 90 : 0;
+        const nextItem = { ...item, rotation: nextRotation, wallRotationOffset };
 
-        return {
-          ...nextItem,
-          ...position,
-        };
+        return applyFurnitureGeometry(room, nextItem, { x: item.x, y: item.y }, snapSize);
       }),
     );
   };
@@ -523,15 +601,264 @@ export function useRoomLayout() {
     setRoom(DEFAULT_ROOM);
     setItems([]);
     setSelectedId(null);
+    setCurrentRoomId(null);
     setCurrentLayoutId(null);
   };
 
   const resizeRoom = (width: number, height: number) => {
-    const nextRoom = normalizeRoomSize(width, height);
+    const resizedRoom = normalizeRoomSize(width, height);
+    const currentShape = getRoomShape(room);
+    const nextRoom = {
+      ...resizedRoom,
+      shape: {
+        ...resizedRoom.shape,
+        obstacles: currentShape.obstacles,
+      },
+    };
     recordHistory();
 
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const applyRoomShapePreset = (preset: RoomShapePreset) => {
+    recordHistory();
+
+    const currentShape = getRoomShape(room);
+    const nextRoom: Room = {
+      ...room,
+      shape: createRoomShapeFromPreset(room.width, room.height, preset, currentShape.obstacles),
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const beginRoomShapeEdit = () => {
+    recordHistory();
+  };
+
+  const moveRoomPoint = (index: number, x: number, y: number) => {
+    const nextRoom: Room = {
+      ...room,
+      shape: {
+        ...getRoomShape(room),
+        points: getRoomShape(room).points.map((point, pointIndex) => {
+          if (pointIndex !== index) {
+            return point;
+          }
+
+          return {
+            x: snapRoomCoordinate(x, snapSize, room.width),
+            y: snapRoomCoordinate(y, snapSize, room.height),
+          };
+        }),
+      },
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const addRoomPoint = (afterIndex: number, x: number, y: number) => {
+    recordHistory();
+
+    const points = getRoomShape(room).points;
+    const insertIndex = clamp(afterIndex + 1, 0, points.length);
+    const nextRoom: Room = {
+      ...room,
+      shape: {
+        ...getRoomShape(room),
+        points: [
+          ...points.slice(0, insertIndex),
+          {
+            x: snapRoomCoordinate(x, snapSize, room.width),
+            y: snapRoomCoordinate(y, snapSize, room.height),
+          },
+          ...points.slice(insertIndex),
+        ],
+      },
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const deleteRoomPoint = (index: number) => {
+    const points = getRoomShape(room).points;
+
+    if (points.length <= 3) {
+      return;
+    }
+
+    recordHistory();
+
+    const nextRoom: Room = {
+      ...room,
+      shape: {
+        ...getRoomShape(room),
+        points: points.filter((_, pointIndex) => pointIndex !== index),
+      },
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+
+  const addPillar = () => {
+    recordHistory();
+
+    const pillarSize = 56;
+    const snappedPillarSize = snapSize === 0 ? pillarSize : snapValue(pillarSize, snapSize);
+    const nextObstacle: RoomObstacle = {
+      id: createObstacleId(),
+      type: 'rect',
+      label: '기둥',
+      width: snappedPillarSize,
+      height: snappedPillarSize,
+      x: snapRoomCoordinate(room.width / 2 - snappedPillarSize / 2, snapSize, room.width - snappedPillarSize),
+      y: snapRoomCoordinate(room.height / 2 - snappedPillarSize / 2, snapSize, room.height - snappedPillarSize),
+    };
+    const nextRoom: Room = {
+      ...room,
+      shape: {
+        ...getRoomShape(room),
+        obstacles: [...getRoomShape(room).obstacles, nextObstacle],
+      },
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const deleteRoomObstacle = (id: string) => {
+    recordHistory();
+    setRoom((currentRoom) => ({
+      ...currentRoom,
+      shape: {
+        ...getRoomShape(currentRoom),
+        obstacles: getRoomShape(currentRoom).obstacles.filter((obstacle) => obstacle.id !== id),
+      },
+    }));
+  };
+
+  const updateRoomObstacle = (id: string, update: Partial<Extract<RoomObstacle, { type: 'rect' }>>) => {
+    recordHistory();
+
+    const nextRoom: Room = {
+      ...room,
+      shape: {
+        ...getRoomShape(room),
+        obstacles: getRoomShape(room).obstacles.map((obstacle) => {
+          if (obstacle.id !== id || obstacle.type !== 'rect') {
+            return obstacle;
+          }
+
+          const nextObstacle = {
+            ...obstacle,
+            ...update,
+          };
+          const nextSize = {
+            width: clamp(snapValue(Math.round(nextObstacle.width), snapSize), 20, room.width),
+            height: clamp(snapValue(Math.round(nextObstacle.height), snapSize), 20, room.height),
+          };
+          const snappedPosition = {
+            x: snapRoomCoordinate(nextObstacle.x, snapSize, room.width - nextSize.width),
+            y: snapRoomCoordinate(nextObstacle.y, snapSize, room.height - nextSize.height),
+          };
+          const clampedPosition = clampPositionToRoomBounds(room, nextSize, snappedPosition.x, snappedPosition.y);
+
+          return {
+            ...nextObstacle,
+            ...nextSize,
+            ...clampedPosition,
+          };
+        }),
+      },
+    };
+
+    setRoom(nextRoom);
+    setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const saveRoom = (name: string, memo: string = '') => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const nextRoom: SavedRoom = {
+      schemaVersion: 5,
+      id: createSavedRoomId(),
+      name: trimmedName,
+      memo: memo.trim(),
+      room,
+      updatedAt: now,
+    };
+
+    setSavedRooms((currentRooms) => {
+      const nextRooms = [nextRoom, ...currentRooms];
+      persistSavedRooms(nextRooms);
+      return nextRooms;
+    });
+    setCurrentRoomId(nextRoom.id);
+    return nextRoom.id;
+  };
+
+  const updateCurrentRoom = () => {
+    if (!currentRoomId) return;
+
+    setSavedRooms((currentRooms) => {
+      const nextRooms = currentRooms.map((savedRoom) => {
+        if (savedRoom.id !== currentRoomId) {
+          return savedRoom;
+        }
+
+        return {
+          ...savedRoom,
+          room,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      persistSavedRooms(nextRooms);
+      return nextRooms;
+    });
+  };
+
+  const loadRoom = (id: string) => {
+    const savedRoom = savedRooms.find((candidate) => candidate.id === id);
+
+    if (!savedRoom) {
+      return;
+    }
+
+    recordHistory();
+    nextObstacleId = getNextObstacleId(savedRoom.room);
+    setRoom(savedRoom.room);
+    setItems([]);
+    setSelectedId(null);
+    setCurrentRoomId(savedRoom.id);
+    setCurrentLayoutId(null);
+  };
+
+  const deleteRoom = (id: string) => {
+    setSavedRooms((currentRooms) => {
+      const nextRooms = currentRooms.filter((savedRoom) => savedRoom.id !== id);
+      persistSavedRooms(nextRooms);
+      return nextRooms;
+    });
+    setSavedLayouts((currentLayouts) => {
+      const nextLayouts = currentLayouts.filter((layout) => layout.roomId !== id);
+      persistSavedLayouts(nextLayouts);
+      return nextLayouts;
+    });
+    if (id === currentRoomId) {
+      setCurrentRoomId(null);
+      setCurrentLayoutId(null);
+    }
   };
 
   const saveLayout = (name: string, memo: string = '') => {
@@ -542,12 +869,18 @@ export function useRoomLayout() {
     }
 
     const now = new Date().toISOString();
+    const roomId = currentRoomId ?? saveRoom(`${trimmedName} 방`, '');
+
+    if (!roomId) {
+      return;
+    }
+
     const nextLayout: SavedLayout = {
-      schemaVersion: 3,
+      schemaVersion: 5,
       id: createSavedLayoutId(),
+      roomId,
       name: trimmedName,
       memo: memo.trim(),
-      room,
       items,
       updatedAt: now,
     };
@@ -557,6 +890,7 @@ export function useRoomLayout() {
       persistSavedLayouts(nextLayouts);
       return nextLayouts;
     });
+    setCurrentRoomId(roomId);
     setCurrentLayoutId(nextLayout.id);
   };
 
@@ -567,12 +901,20 @@ export function useRoomLayout() {
       return;
     }
 
+    const layoutRoom = savedRooms.find((savedRoom) => savedRoom.id === layout.roomId);
+
+    if (!layoutRoom) {
+      return;
+    }
+
     recordHistory();
 
     nextFurnitureId = getNextFurnitureId(layout.items);
-    setRoom(layout.room);
-    setItems(clampItemsToRoom(layout.room, layout.items));
+    nextObstacleId = getNextObstacleId(layoutRoom.room);
+    setRoom(layoutRoom.room);
+    setItems(clampItemsToRoom(layoutRoom.room, layout.items));
     setSelectedId(null);
+    setCurrentRoomId(layoutRoom.id);
     setCurrentLayoutId(layout.id);
   };
 
@@ -597,7 +939,7 @@ export function useRoomLayout() {
         }
         return {
           ...layout,
-          room,
+          roomId: currentRoomId ?? layout.roomId,
           items,
           updatedAt: new Date().toISOString(),
         };
@@ -632,9 +974,12 @@ export function useRoomLayout() {
     selectedId,
     selectedItem,
     currentLayout,
+    currentRoom,
     hasUnsavedChanges,
+    hasUnsavedRoomChanges,
     overlappingItemIds,
     snapSize,
+    savedRooms,
     savedLayouts,
     canUndo: pastLayouts.length > 0,
     canRedo: futureLayouts.length > 0,
@@ -651,11 +996,24 @@ export function useRoomLayout() {
     setSnapSize,
     resetLayout,
     resizeRoom,
+    applyRoomShapePreset,
+    beginRoomShapeEdit,
+    moveRoomPoint,
+    addRoomPoint,
+    deleteRoomPoint,
+    addPillar,
+    deleteRoomObstacle,
+    updateRoomObstacle,
+    saveRoom,
+    loadRoom,
+    deleteRoom,
+    updateCurrentRoom,
     saveLayout,
     loadLayout,
     deleteLayout,
     updateLayoutMeta,
     currentLayoutId,
+    currentRoomId,
     updateCurrentLayout,
     undoLayoutChange,
     redoLayoutChange,

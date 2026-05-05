@@ -1,43 +1,97 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { LayoutElementKind, PlacedFurniture, SavedLayout } from '../types/layout';
+import type { LayoutElementKind, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
+import { createRectRoomShape } from '../utils/geometry';
 
-const STORAGE_KEY = 'virtual-room-layout:saved-layouts';
-export const CURRENT_SCHEMA_VERSION = 3;
+const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
+const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
+export const CURRENT_SCHEMA_VERSION = 5;
 
-interface StoredLayoutsV2 {
+interface StoredLayoutsPayload {
   schemaVersion: number;
+  layouts: LegacySavedLayout[];
+}
+
+interface StoredRoomsPayload {
+  schemaVersion: number;
+  rooms: SavedRoom[];
+}
+
+interface WorkspaceState {
+  rooms: SavedRoom[];
   layouts: SavedLayout[];
 }
+
+type LegacySavedLayout = {
+  schemaVersion?: number;
+  id: string;
+  roomId?: string;
+  name: string;
+  memo?: string;
+  room?: Room;
+  items: PlacedFurniture[];
+  updatedAt: string;
+};
 
 function canUseStorage() {
   return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
 }
 
-function isSavedLayout(value: unknown): value is SavedLayout {
+function isRoom(value: unknown): value is Room {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
-  const draft = value as Partial<SavedLayout>;
+  const draft = value as Partial<Room>;
+  return typeof draft.width === 'number' && typeof draft.height === 'number';
+}
+
+function isSavedRoom(value: unknown): value is SavedRoom {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const draft = value as Partial<SavedRoom>;
   return (
     (draft.schemaVersion === undefined || typeof draft.schemaVersion === 'number') &&
     typeof draft.id === 'string' &&
     typeof draft.name === 'string' &&
     typeof draft.updatedAt === 'string' &&
-    !!draft.room &&
-    typeof draft.room.width === 'number' &&
-    typeof draft.room.height === 'number' &&
-    Array.isArray(draft.items)
+    isRoom(draft.room)
   );
 }
 
-function isStoredLayoutsV2(value: unknown): value is StoredLayoutsV2 {
+function isLegacySavedLayout(value: unknown): value is LegacySavedLayout {
   if (!value || typeof value !== 'object') {
     return false;
   }
 
-  const draft = value as Partial<StoredLayoutsV2>;
+  const draft = value as Partial<LegacySavedLayout>;
+  return (
+    (draft.schemaVersion === undefined || typeof draft.schemaVersion === 'number') &&
+    typeof draft.id === 'string' &&
+    typeof draft.name === 'string' &&
+    typeof draft.updatedAt === 'string' &&
+    Array.isArray(draft.items) &&
+    (typeof draft.roomId === 'string' || isRoom(draft.room))
+  );
+}
+
+function isStoredLayoutsPayload(value: unknown): value is StoredLayoutsPayload {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const draft = value as Partial<StoredLayoutsPayload>;
   return typeof draft.schemaVersion === 'number' && Array.isArray(draft.layouts);
+}
+
+function isStoredRoomsPayload(value: unknown): value is StoredRoomsPayload {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const draft = value as Partial<StoredRoomsPayload>;
+  return typeof draft.schemaVersion === 'number' && Array.isArray(draft.rooms);
 }
 
 function inferElementKind(item: Partial<PlacedFurniture>): LayoutElementKind {
@@ -70,58 +124,145 @@ function migratePlacedFurniture(item: PlacedFurniture): PlacedFurniture {
     objectHeight: item.objectHeight ?? catalogDefaults?.objectHeight ?? (kind === 'door' ? 210 : kind === 'window' ? 100 : 70),
     elevation: item.elevation ?? catalogDefaults?.elevation ?? 0,
     isWallAttached: item.isWallAttached ?? (kind === 'door' || kind === 'window'),
+    wallSegmentId: item.wallSegmentId,
+    wallRotationOffset: item.wallRotationOffset ?? 0,
     doorHinge: item.doorHinge,
     doorSwingDir: item.doorSwingDir,
     showDoorSwing: item.showDoorSwing ?? false,
   };
 }
 
-function migrateSavedLayout(layout: SavedLayout): SavedLayout {
+function migrateRoom(room: Room): Room {
+  if (room.shape?.type === 'polygon' && Array.isArray(room.shape.points)) {
+    return {
+      ...room,
+      shape: {
+        ...room.shape,
+        obstacles: Array.isArray(room.shape.obstacles) ? room.shape.obstacles : [],
+      },
+    };
+  }
+
   return {
-    ...layout,
+    ...room,
+    shape: createRectRoomShape(room.width, room.height),
+  };
+}
+
+function createRoomId(layout: LegacySavedLayout) {
+  return `room-${layout.id}`;
+}
+
+function migrateSavedRoom(room: SavedRoom): SavedRoom {
+  return {
+    ...room,
     schemaVersion: CURRENT_SCHEMA_VERSION,
+    memo: room.memo ?? '',
+    room: migrateRoom(room.room),
+  };
+}
+
+function migrateSavedLayout(layout: LegacySavedLayout, fallbackRoomId: string): SavedLayout {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    id: layout.id,
+    roomId: layout.roomId ?? fallbackRoomId,
+    name: layout.name,
     memo: layout.memo ?? '',
     items: layout.items.map(migratePlacedFurniture),
+    updatedAt: layout.updatedAt,
   };
 }
 
-export function parseSavedLayoutsPayload(rawValue: string): SavedLayout[] {
+function readJson(rawValue: string | null): unknown {
+  if (!rawValue) {
+    return null;
+  }
+
   try {
-    const parsedValue: unknown = JSON.parse(rawValue);
-
-    if (isStoredLayoutsV2(parsedValue)) {
-      return parsedValue.layouts.filter(isSavedLayout).map(migrateSavedLayout);
-    }
-
-    if (Array.isArray(parsedValue)) {
-      return parsedValue.filter(isSavedLayout).map(migrateSavedLayout);
-    }
-
-    return [];
+    return JSON.parse(rawValue);
   } catch {
-    return [];
+    return null;
   }
 }
 
-export function createStoredLayoutsPayload(layouts: SavedLayout[]): StoredLayoutsV2 {
+export function parseSavedRoomsPayload(rawValue: string): SavedRoom[] {
+  const parsedValue = readJson(rawValue);
+
+  if (isStoredRoomsPayload(parsedValue)) {
+    return parsedValue.rooms.filter(isSavedRoom).map(migrateSavedRoom);
+  }
+
+  if (Array.isArray(parsedValue)) {
+    return parsedValue.filter(isSavedRoom).map(migrateSavedRoom);
+  }
+
+  return [];
+}
+
+export function parseSavedLayoutsPayload(rawValue: string, knownRooms: SavedRoom[] = []): WorkspaceState {
+  const parsedValue = readJson(rawValue);
+  const legacyLayouts = isStoredLayoutsPayload(parsedValue)
+    ? parsedValue.layouts.filter(isLegacySavedLayout)
+    : Array.isArray(parsedValue)
+      ? parsedValue.filter(isLegacySavedLayout)
+      : [];
+  const roomsById = new Map(knownRooms.map((room) => [room.id, migrateSavedRoom(room)]));
+  const layouts = legacyLayouts.map((layout) => {
+    const fallbackRoomId = layout.roomId ?? createRoomId(layout);
+
+    if (!layout.roomId && layout.room) {
+      roomsById.set(fallbackRoomId, {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        id: fallbackRoomId,
+        name: `${layout.name} 방`,
+        memo: layout.memo ?? '',
+        room: migrateRoom(layout.room),
+        updatedAt: layout.updatedAt,
+      });
+    }
+
+    return migrateSavedLayout(layout, fallbackRoomId);
+  });
+
+  return {
+    rooms: [...roomsById.values()],
+    layouts,
+  };
+}
+
+export function createStoredRoomsPayload(rooms: SavedRoom[]): StoredRoomsPayload {
   return {
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    layouts: layouts.map(migrateSavedLayout),
+    rooms: rooms.map(migrateSavedRoom),
   };
 }
 
-export function loadSavedLayouts(): SavedLayout[] {
+export function createStoredLayoutsPayload(layouts: SavedLayout[]): StoredLayoutsPayload {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    layouts: layouts.map((layout) => migrateSavedLayout(layout, layout.roomId)),
+  };
+}
+
+export function loadWorkspaceState(): WorkspaceState {
   if (!canUseStorage()) {
-    return [];
+    return {
+      rooms: [],
+      layouts: [],
+    };
   }
 
-  const rawValue = window.localStorage.getItem(STORAGE_KEY);
+  const rooms = parseSavedRoomsPayload(window.localStorage.getItem(ROOM_STORAGE_KEY) ?? '[]');
+  return parseSavedLayoutsPayload(window.localStorage.getItem(LAYOUT_STORAGE_KEY) ?? '[]', rooms);
+}
 
-  if (!rawValue) {
-    return [];
+export function persistSavedRooms(rooms: SavedRoom[]) {
+  if (!canUseStorage()) {
+    return;
   }
 
-  return parseSavedLayoutsPayload(rawValue);
+  window.localStorage.setItem(ROOM_STORAGE_KEY, JSON.stringify(createStoredRoomsPayload(rooms)));
 }
 
 export function persistSavedLayouts(layouts: SavedLayout[]) {
@@ -129,7 +270,5 @@ export function persistSavedLayouts(layouts: SavedLayout[]) {
     return;
   }
 
-  const nextValue = createStoredLayoutsPayload(layouts);
-
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextValue));
+  window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(createStoredLayoutsPayload(layouts)));
 }

@@ -303,19 +303,55 @@ button {
   background:
     linear-gradient(90deg, rgba(177, 188, 214, 0.12) 1px, transparent 1px),
     linear-gradient(rgba(177, 188, 214, 0.12) 1px, transparent 1px),
-    #fdfefe;
+    #eef2f7;
   background-size: 24px 24px;
 }
 
-.room-label {
+.room-shape-layer {
   position: absolute;
-  left: 16px;
-  top: 14px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #4b5563;
-  font-size: 13px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.room-shape-fill {
+  fill: #fdfefe;
+}
+
+.room-shape-outline {
+  fill: none;
+  stroke: #94a3b8;
+  stroke-width: 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.room-obstacle {
+  fill: #cbd5e1;
+  stroke: #64748b;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.room-wall-hit-area {
+  stroke: transparent;
+  stroke-width: 18;
+  stroke-linecap: round;
+  cursor: copy;
+  pointer-events: auto;
+}
+
+.room-point-handle {
+  fill: #111827;
+  stroke: #ffffff;
+  stroke-width: 3;
+  cursor: grab;
+  pointer-events: auto;
+  vector-effect: non-scaling-stroke;
+}
+
+.room-point-handle:active {
+  cursor: grabbing;
 }
 
 .furniture-item {
@@ -601,6 +637,7 @@ button {
 }
 
 .snap-editor,
+.room-shape-editor,
 .label-editor,
 .furniture-editor {
   display: grid;
@@ -611,6 +648,7 @@ button {
 
 .room-size-editor h3,
 .snap-editor h3,
+.room-shape-editor h3,
 .label-editor h3,
 .furniture-editor h3,
 .saved-layouts h3 {
@@ -618,8 +656,77 @@ button {
   font-size: 16px;
 }
 
-.room-size-editor p {
+.room-size-editor p,
+.room-shape-editor p {
   margin: 0;
+  color: #5b6473;
+  font-size: 13px;
+}
+
+.shape-preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.room-edit-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #475569;
+  font-weight: 600;
+}
+
+.obstacle-list {
+  display: grid;
+  gap: 8px;
+}
+
+.obstacle-row {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8faff;
+}
+
+.obstacle-title {
+  display: grid;
+  gap: 8px;
+}
+
+.obstacle-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.obstacle-fields label {
+  display: grid;
+  gap: 4px;
+  color: #5b6473;
+  font-size: 12px;
+}
+
+.obstacle-fields input {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #cfd7e6;
+  border-radius: 8px;
+  font: inherit;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.obstacle-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.obstacle-row span,
+.obstacle-fields span {
   color: #5b6473;
   font-size: 13px;
 }

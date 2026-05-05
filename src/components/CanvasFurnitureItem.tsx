@@ -13,6 +13,8 @@ interface CanvasFurnitureItemProps {
 export function CanvasFurnitureItem({ item, isSelected, isOverlapping, onPointerDown }: CanvasFurnitureItemProps) {
   const footprint = getRotatedSize(item);
   const isDoor = item.templateId === 'door';
+  const normalizedRotation = ((item.rotation % 360) + 360) % 360;
+  const usesFreeRotation = normalizedRotation !== 0 && normalizedRotation !== 90 && normalizedRotation !== 180 && normalizedRotation !== 270;
 
   return (
     <button
@@ -24,6 +26,8 @@ export function CanvasFurnitureItem({ item, isSelected, isOverlapping, onPointer
         width: footprint.width,
         height: footprint.height,
         backgroundColor: item.color,
+        transform: usesFreeRotation ? `rotate(${normalizedRotation}deg)` : undefined,
+        transformOrigin: usesFreeRotation ? 'center center' : undefined,
       }}
       onPointerDown={(event) => onPointerDown(event, item)}
     >

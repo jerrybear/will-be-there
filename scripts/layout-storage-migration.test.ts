@@ -3,6 +3,7 @@ import {
   createStoredLayoutsPayload,
   parseSavedLayoutsPayload,
 } from '../src/state/layoutStorage';
+import { createRoomShapeFromPreset, getNearestWallProjection, isRectInsideRoom } from '../src/utils/geometry';
 
 function assertEqual<T>(actual: T, expected: T) {
   if (actual !== expected) {
@@ -58,19 +59,29 @@ const legacyObjectPayload = JSON.stringify({
   ],
 });
 
-const [arrayLayout] = parseSavedLayoutsPayload(legacyArrayPayload);
+const arrayState = parseSavedLayoutsPayload(legacyArrayPayload);
+const [arrayLayout] = arrayState.layouts;
+const [arrayRoom] = arrayState.rooms;
 
 assertEqual(arrayLayout.schemaVersion, CURRENT_SCHEMA_VERSION);
+assertEqual(arrayLayout.roomId, arrayRoom.id);
 assertEqual(arrayLayout.memo, '');
+assertEqual(arrayRoom.room.shape.type, 'polygon');
+assertEqual(arrayRoom.room.shape.points.length, 4);
 assertEqual(arrayLayout.items[0].kind, 'window');
 assertEqual(arrayLayout.items[0].objectHeight, 100);
 assertEqual(arrayLayout.items[0].elevation, 90);
 assertEqual(arrayLayout.items[0].isWallAttached, true);
 
-const [objectLayout] = parseSavedLayoutsPayload(legacyObjectPayload);
+const objectState = parseSavedLayoutsPayload(legacyObjectPayload);
+const [objectLayout] = objectState.layouts;
+const [objectRoom] = objectState.rooms;
 
 assertEqual(objectLayout.schemaVersion, CURRENT_SCHEMA_VERSION);
 assertEqual(objectLayout.memo, 'old memo');
+assertEqual(objectLayout.roomId, objectRoom.id);
+assertEqual(objectRoom.room.shape.type, 'polygon');
+assertEqual(objectRoom.room.shape.points[2].x, 640);
 assertEqual(objectLayout.items[0].kind, 'door');
 assertEqual(objectLayout.items[0].objectHeight, 210);
 assertEqual(objectLayout.items[0].elevation, 0);
@@ -81,3 +92,29 @@ const persistedPayload = createStoredLayoutsPayload([arrayLayout, objectLayout])
 assertEqual(persistedPayload.schemaVersion, CURRENT_SCHEMA_VERSION);
 assertEqual(persistedPayload.layouts.length, 2);
 assertEqual(persistedPayload.layouts[0].schemaVersion, CURRENT_SCHEMA_VERSION);
+
+const diagonalRoom = {
+  width: 720,
+  height: 480,
+  shape: createRoomShapeFromPreset(720, 480, 'diagonal'),
+};
+
+assertEqual(diagonalRoom.shape.points.length, 5);
+assertEqual(isRectInsideRoom(diagonalRoom, { x: 240, y: 160, width: 80, height: 80 }), true);
+assertEqual(
+  isRectInsideRoom(
+    {
+      ...diagonalRoom,
+      shape: {
+        ...diagonalRoom.shape,
+        obstacles: [{ id: 'obstacle-test', type: 'rect', label: '기둥', x: 240, y: 160, width: 80, height: 80 }],
+      },
+    },
+    { x: 250, y: 170, width: 20, height: 20 },
+  ),
+  false,
+);
+
+const nearestWall = getNearestWallProjection(diagonalRoom, { x: 30, y: 400 });
+
+assertEqual(nearestWall?.segment.id, 'wall-3');
