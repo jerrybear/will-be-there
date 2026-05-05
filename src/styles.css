@@ -1066,3 +1066,54 @@ button {
   text-align: center;
   color: #0f172a;
 }
+
+/* Light Controls */
+.light-controls-panel {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  width: 220px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.light-controls-title {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.light-controls-panel .control-group {
+  margin-bottom: 12px;
+}
+
+.light-controls-panel .control-group:last-child {
+  margin-bottom: 0;
+}
+
+.light-controls-panel label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.light-controls-panel input[type="range"] {
+  width: 100%;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
