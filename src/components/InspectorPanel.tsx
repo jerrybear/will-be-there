@@ -506,7 +506,7 @@ export function InspectorPanel({
 
   const snapSection = (
     <div className="snap-editor">
-      <h3>스냅</h3>
+      <h3>그리드 설정</h3>
       <label>
         <span>이동/입력 단위</span>
         <select value={snapSize} onChange={(event) => onSnapSizeChange(Number(event.target.value) as SnapSize)}>
@@ -591,7 +591,7 @@ export function InspectorPanel({
       {currentLayoutId && currentLayout ? (
         <div className="active-layout-section">
           <h3>
-            현재 작업 중: {currentLayout.name}
+            현재 도면: {currentLayout.name}
             {hasUnsavedChanges ? ' · 수정됨' : ''}
           </h3>
           {currentLayout.memo && <p className="layout-memo">{currentLayout.memo}</p>}
@@ -601,7 +601,7 @@ export function InspectorPanel({
           
           <hr className="section-divider" />
           
-          <h3>새로운 도면으로 복사</h3>
+          <h3>새 도면으로 복사 저장</h3>
           <form className="save-form" onSubmit={handleSave}>
             <input
               type="text"
@@ -625,7 +625,7 @@ export function InspectorPanel({
         </div>
       ) : (
         <div className="new-layout-section">
-          <h3>{currentRoom ? `${currentRoom.name} 도면 저장` : '새 도면 저장'}</h3>
+          <h3>{currentRoom ? `${currentRoom.name} 도면` : '저장된 도면'}</h3>
           <form className="save-form" onSubmit={handleSave}>
             <input
               type="text"
@@ -673,7 +673,7 @@ export function InspectorPanel({
       <form className="room-size-form" onSubmit={handleRoomSizeApply}>
         <div className="dimension-fields">
           <label>
-            <span>폭</span>
+            <span>가로 너비 (mm)</span>
             <input
               type="number"
               min="240"
@@ -684,7 +684,7 @@ export function InspectorPanel({
             />
           </label>
           <label>
-            <span>높이</span>
+            <span>세로 깊이 (mm)</span>
             <input
               type="number"
               min="180"
@@ -699,13 +699,13 @@ export function InspectorPanel({
           적용
         </button>
       </form>
-      <p>240×180부터 1200×900까지 조정할 수 있습니다.</p>
+      <p>240 × 180부터 1200 × 900까지 조정할 수 있습니다.</p>
     </div>
   );
 
   const roomShapeSection = (
     <div className="room-shape-editor">
-      <h3>방 형태</h3>
+      <h3>방 외곽 편집</h3>
       <label className="toggle-label room-edit-toggle">
         <input
           type="checkbox"
@@ -832,14 +832,14 @@ export function InspectorPanel({
     return (
       <section className="panel inspector-panel">
         <div className="panel-header">
-          <h2>선택 가구</h2>
-          <p>방 안의 가구를 클릭하면 상세 정보가 보입니다.</p>
+          <h2>방 설정</h2>
+          <p>방 크기, 외곽선, 저장 항목을 관리합니다</p>
         </div>
         {snapSection}
         {roomSizeSection}
         {roomShapeSection}
         {savedRoomsSection}
-        <div className="empty-state">아직 선택된 가구가 없습니다.</div>
+        <div className="empty-state">선택된 가구가 없으면 방 설정이 여기에 표시됩니다.</div>
         {savedLayoutsSection}
       </section>
     );
@@ -961,14 +961,14 @@ export function InspectorPanel({
             ⚠️ 다른 가구와 겹쳐 있습니다
           </div>
         ) : (
-          <p>현재 선택된 가구의 배치 정보입니다.</p>
+          <p>선택한 항목의 속성을 조정합니다</p>
         )}
       </div>
 
       {snapSection}
 
       <div className="label-editor">
-        <h3>이름</h3>
+        <h3>선택 항목</h3>
         {labelEditorSection}
       </div>
 
@@ -1008,7 +1008,7 @@ export function InspectorPanel({
       </dl>
 
       <div className="furniture-editor">
-        <h3>위치/3D 크기</h3>
+        <h3>위치와 3D 크기</h3>
         {furnitureGeometrySection}
       </div>
 

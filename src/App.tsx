@@ -91,6 +91,7 @@ export default function App() {
         viewMode={viewMode}
         savedLayouts={savedLayouts}
         currentLayoutId={currentLayout?.id ?? null}
+        currentLayoutName={currentLayout?.name ?? null}
         hasUnsavedChanges={hasUnsavedChanges}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -101,6 +102,7 @@ export default function App() {
         onLoad={loadLayout}
         onDelete={deleteLayout}
         onUpdateMeta={updateLayoutMeta}
+        onSaveCurrent={updateCurrentLayout}
       />
 
       <main className="workspace-grid">
@@ -117,6 +119,7 @@ export default function App() {
             onSelect={selectFurniture}
             onMoveStart={beginFurnitureMove}
             onMove={moveFurniture}
+            onRoomEditingChange={setIsRoomEditingEnabled}
             onRoomPointMoveStart={beginRoomShapeEdit}
             onRoomPointMove={moveRoomPoint}
             onRoomPointAdd={addRoomPoint}
@@ -124,7 +127,7 @@ export default function App() {
           />
         ) : (
           <Suspense fallback={<section className="panel preview-panel" />}>
-            <Preview3DScene room={room} items={items} />
+            <Preview3DScene room={room} items={items} selectedId={selectedId} />
           </Suspense>
         )}
         <InspectorPanel

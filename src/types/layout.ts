@@ -3,6 +3,7 @@ export type SnapSize = 0 | 10 | 24;
 export type LayoutElementKind = 'furniture' | 'door' | 'window';
 export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
+export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
 
 export interface Size {
   width: number;
@@ -43,6 +44,7 @@ export interface Room extends Size {
 export interface FurnitureTemplate extends Size {
   id: string;
   label: string;
+  category: FurnitureCategory;
   color: string;
   kind: LayoutElementKind;
   objectHeight: number;

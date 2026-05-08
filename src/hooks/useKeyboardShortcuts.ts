@@ -123,8 +123,9 @@ export function useKeyboardShortcuts({
       }
 
       // 5. Other
-      if (event.key.toLowerCase() === 's') {
+      if (!isMod && event.key.toLowerCase() === 's') {
         // Toggle snapping: if snapSize > 0, set to 0. Otherwise set to 24.
+        event.preventDefault();
         onSnapSizeChange(snapSize > 0 ? 0 : 24);
       }
     };
@@ -144,5 +145,6 @@ export function useKeyboardShortcuts({
     onUndo,
     onRedo,
     onSnapSizeChange,
+    isRoomEditingEnabled,
   ]);
 }

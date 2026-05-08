@@ -4,6 +4,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   {
     id: 'door',
     label: '문',
+    category: 'doors',
     width: 80,
     height: 24,
     color: '#cbd5e1',
@@ -15,6 +16,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   {
     id: 'window',
     label: '창문',
+    category: 'windows',
     width: 120,
     height: 24,
     color: '#bae6fd',
@@ -26,6 +28,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   {
     id: 'bed',
     label: '침대',
+    category: 'seating',
     width: 180,
     height: 100,
     color: '#7c9cf5',
@@ -36,6 +39,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   {
     id: 'desk',
     label: '책상',
+    category: 'tables',
     width: 140,
     height: 70,
     color: '#6bc3a2',
@@ -46,6 +50,7 @@ export const furnitureCatalog: FurnitureTemplate[] = [
   {
     id: 'sofa',
     label: '소파',
+    category: 'storage',
     width: 160,
     height: 90,
     color: '#f2a86b',

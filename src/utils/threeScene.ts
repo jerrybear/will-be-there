@@ -41,6 +41,7 @@ export function createFloorMesh(room: Room) {
 }
 
 interface WallOpening {
+  itemId: string;
   /** Distance from wall start to opening center, in room units */
   centerAlongWall: number;
   /** Opening width in room units */
@@ -93,6 +94,7 @@ function getOpeningsByWall(
     const centerAlongWall = projectItemToWallLocal(segment, item);
 
     const opening: WallOpening = {
+      itemId: item.id,
       centerAlongWall,
       width: item.width,
       height: item.objectHeight,
@@ -197,7 +199,41 @@ function createGlassPanel(
   return mesh;
 }
 
-export function createWallMeshes(room: Room, items: PlacedFurniture[]) {
+function createOpeningOutline(
+  wallLength: number,
+  wallHeight: number,
+  opening: WallOpening,
+  wallThickness: number,
+): THREE.LineSegments | null {
+  const halfW = toWorldLength(opening.width) / 2;
+  const center = toWorldLength(opening.centerAlongWall);
+  const left = Math.max(0, center - halfW);
+  const right = Math.min(wallLength, center + halfW);
+  const bottom = toWorldLength(opening.elevation);
+  const top = Math.min(wallHeight, toWorldLength(opening.elevation + opening.height));
+
+  if (right - left < 0.001 || top - bottom < 0.001) {
+    return null;
+  }
+
+  const z = wallThickness / 2 + 0.004;
+  const points = [
+    new THREE.Vector3(left - wallLength / 2, bottom, z),
+    new THREE.Vector3(right - wallLength / 2, bottom, z),
+    new THREE.Vector3(right - wallLength / 2, bottom, z),
+    new THREE.Vector3(right - wallLength / 2, top, z),
+    new THREE.Vector3(right - wallLength / 2, top, z),
+    new THREE.Vector3(left - wallLength / 2, top, z),
+    new THREE.Vector3(left - wallLength / 2, top, z),
+    new THREE.Vector3(left - wallLength / 2, bottom, z),
+  ];
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color: 0x2563eb });
+
+  return new THREE.LineSegments(geometry, material);
+}
+
+export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedId: string | null = null) {
   const segments = getRoomWallSegments(room);
   const openingsMap = getOpeningsByWall(room, items, segments);
   const wallThickness = toWorldLength(WALL_THICKNESS);
@@ -251,6 +287,14 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[]) {
           group.add(glass);
         }
       }
+
+      if (opening.itemId === selectedId) {
+        const outline = createOpeningOutline(segmentLength, wallHeight, opening, wallThickness);
+
+        if (outline) {
+          group.add(outline);
+        }
+      }
     }
 
     // Position and rotate group in world space
@@ -298,7 +342,7 @@ export function createObstacleMeshes(room: Room) {
   });
 }
 
-export function createItemMesh(room: Room, item: PlacedFurniture) {
+export function createItemMesh(room: Room, item: PlacedFurniture, isSelected = false) {
   const width = toWorldLength(item.width);
   const depth = toWorldLength(item.height);
   const height = Math.max(toWorldLength(item.objectHeight), toWorldLength(4));
@@ -307,6 +351,8 @@ export function createItemMesh(room: Room, item: PlacedFurniture) {
   const geometry = new THREE.BoxGeometry(width, height, depth);
   const material = new THREE.MeshStandardMaterial({
     color: new THREE.Color(item.color),
+    emissive: new THREE.Color(isSelected ? 0x1d4ed8 : 0x000000),
+    emissiveIntensity: isSelected ? 0.28 : 0,
     roughness: 0.72,
     metalness: 0.03,
   });
@@ -321,17 +367,25 @@ export function createItemMesh(room: Room, item: PlacedFurniture) {
   mesh.castShadow = true;
   mesh.receiveShadow = true;
 
+  if (isSelected) {
+    const outline = new THREE.LineSegments(
+      new THREE.EdgesGeometry(geometry),
+      new THREE.LineBasicMaterial({ color: 0x2563eb }),
+    );
+    mesh.add(outline);
+  }
+
   return mesh;
 }
 
-export function createRoomSceneObjects(room: Room, items: PlacedFurniture[]) {
+export function createRoomSceneObjects(room: Room, items: PlacedFurniture[], selectedId: string | null = null) {
   // Door/window items are rendered as wall openings, not as separate meshes
   const furnitureItems = items.filter((item) => item.kind === 'furniture');
 
   return [
     createFloorMesh(room),
-    ...createWallMeshes(room, items),
+    ...createWallMeshes(room, items, selectedId),
     ...createObstacleMeshes(room),
-    ...furnitureItems.map((item) => createItemMesh(room, item)),
+    ...furnitureItems.map((item) => createItemMesh(room, item, item.id === selectedId)),
   ];
 }

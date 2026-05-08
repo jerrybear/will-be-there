@@ -15,6 +15,7 @@ interface RoomCanvasProps {
   onSelect: (id: string | null) => void;
   onMoveStart: () => void;
   onMove: (id: string, x: number, y: number) => void;
+  onRoomEditingChange: (enabled: boolean) => void;
   onRoomPointMoveStart: () => void;
   onRoomPointMove: (index: number, x: number, y: number) => void;
   onRoomPointAdd: (afterIndex: number, x: number, y: number) => void;
@@ -42,6 +43,7 @@ export function RoomCanvas({
   onSelect,
   onMoveStart,
   onMove,
+  onRoomEditingChange,
   onRoomPointMoveStart,
   onRoomPointMove,
   onRoomPointAdd,
@@ -63,11 +65,15 @@ export function RoomCanvas({
     endPan,
     zoomIn,
     zoomOut,
+    centerViewport,
     resetViewport,
-  } = useCanvasViewport();
+  } = useCanvasViewport(room.width, room.height);
   const reactId = useId();
   const gridPatternId = `room-grid-${reactId.replace(/:/g, '')}`;
   const gridSize = snapSize || 24;
+  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
+  const focusX = selectedItem ? selectedItem.x : room.width / 2;
+  const focusY = selectedItem ? selectedItem.y : room.height / 2;
 
   useEffect(() => {
     if (!dragState) {
@@ -132,6 +138,25 @@ export function RoomCanvas({
       window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [onRoomPointMove, pointDragState, zoom]);
+
+  useEffect(() => {
+    const shell = shellRef.current;
+
+    if (!shell) {
+      return undefined;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      centerViewport();
+    });
+
+    resizeObserver.observe(shell);
+    centerViewport();
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [room.height, room.width, shellRef]);
 
   const handleShellPointerDown = (e: React.PointerEvent) => {
     const startedPan = beginPan(e);
@@ -210,9 +235,30 @@ export function RoomCanvas({
 
   return (
     <section className="panel canvas-panel">
-      <div className="panel-header">
-        <h2>방 편집 화면</h2>
-        <p>가구를 클릭해서 선택하고 드래그로 위치를 옮겨보세요.</p>
+      <div className="canvas-top-toolbar">
+        <button
+          type="button"
+          className={!isRoomEditingEnabled ? 'is-active' : ''}
+          onClick={() => onRoomEditingChange(false)}
+        >
+          선택
+        </button>
+        <button
+          type="button"
+          className={isRoomEditingEnabled ? 'is-active' : ''}
+          onClick={() => onRoomEditingChange(true)}
+        >
+          벽 편집
+        </button>
+        <button type="button" disabled>
+          치수
+        </button>
+        <button type="button" disabled>
+          메모
+        </button>
+        <button type="button" disabled>
+          레이어
+        </button>
       </div>
 
       <div className="room-shell-wrapper">
@@ -309,14 +355,17 @@ export function RoomCanvas({
       </div>
       {isSelfIntersecting && isRoomEditingEnabled && (
         <div className="self-intersection-banner">
-          ⚠️ 벽이 교차하고 있습니다. 꼭짓점을 이동하여 교차를 해소해 주세요.
+          벽이 교차하고 있습니다. 꼭짓점을 이동해 형태를 정리하세요.
         </div>
       )}
       <div className="zoom-controls">
         <button type="button" onClick={zoomOut}>-</button>
         <span>{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={zoomIn}>+</button>
-        <button type="button" onClick={resetViewport}>초기화</button>
+        <button type="button" onClick={resetViewport}>맞춤</button>
+      </div>
+      <div className="canvas-coordinates">
+        X: {Math.round(focusX)}mm&nbsp;&nbsp;Y: {Math.round(focusY)}mm
       </div>
     </section>
   );

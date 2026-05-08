@@ -5,6 +5,7 @@ interface TopBarProps {
   viewMode: ViewMode;
   savedLayouts: SavedLayout[];
   currentLayoutId: string | null;
+  currentLayoutName: string | null;
   hasUnsavedChanges: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -15,6 +16,7 @@ interface TopBarProps {
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onUpdateMeta: (id: string, name: string, memo: string) => void;
+  onSaveCurrent: () => void;
 }
 
 function formatSavedTime(value: string) {
@@ -30,6 +32,7 @@ export function TopBar({
   viewMode,
   savedLayouts,
   currentLayoutId,
+  currentLayoutName,
   hasUnsavedChanges,
   canUndo,
   canRedo,
@@ -40,8 +43,10 @@ export function TopBar({
   onLoad,
   onDelete,
   onUpdateMeta,
+  onSaveCurrent,
 }: TopBarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isShortcutOpen, setIsShortcutOpen] = useState(false);
   const [editingLayoutId, setEditingLayoutId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState({ name: '', memo: '' });
 
@@ -64,40 +69,80 @@ export function TopBar({
     setIsOpen(false);
   };
 
+  const handleViewModeChange = (mode: ViewMode) => {
+    setIsOpen(false);
+    setIsShortcutOpen(false);
+    onViewModeChange(mode);
+  };
+
+  const handleShortcutToggle = () => {
+    setIsOpen(false);
+    setIsShortcutOpen((current) => !current);
+  };
+
+  const handleSavedLayoutsToggle = () => {
+    setIsShortcutOpen(false);
+    setIsOpen((current) => !current);
+  };
+
   return (
     <header className="top-bar">
-      <div>
-        <h1>이거여기</h1>
-        <p>옮기기 전에, 여기 한번 놔보기</p>
+      <div className="top-bar-brand">
+        <div className="top-bar-title-row">
+          <h1>이거여기</h1>
+          <span className="top-bar-chip">{viewMode === '2d' ? '2D 편집' : '3D 미리보기'}</span>
+        </div>
+        <p>{currentLayoutName ? `${currentLayoutName}${hasUnsavedChanges ? ' · 수정됨' : ''}` : '옮기기 전에, 여기 한번 놔 보기'}</p>
       </div>
       <div className="top-bar-actions">
         <div className="view-mode-toggle" aria-label="보기 전환">
           <button
             type="button"
             className={viewMode === '2d' ? 'active' : ''}
-            onClick={() => onViewModeChange('2d')}
+            onClick={() => handleViewModeChange('2d')}
           >
             2D 편집
           </button>
           <button
             type="button"
             className={viewMode === '3d' ? 'active' : ''}
-            onClick={() => onViewModeChange('3d')}
+            onClick={() => handleViewModeChange('3d')}
           >
             3D 미리보기
           </button>
         </div>
         <div className="history-actions">
           <button type="button" className="ghost-button compact-button" onClick={onUndo} disabled={!canUndo}>
-            Undo
+            실행 취소
           </button>
           <button type="button" className="ghost-button compact-button" onClick={onRedo} disabled={!canRedo}>
-            Redo
+            다시 실행
           </button>
         </div>
+        <div className="shortcuts-dropdown">
+          <button type="button" className="ghost-button" onClick={handleShortcutToggle}>
+            단축키
+          </button>
+          {isShortcutOpen && (
+            <div className="shortcuts-menu">
+              <h3>단축키</h3>
+              <dl>
+                <div><dt>⌘/Ctrl + Z</dt><dd>실행 취소</dd></div>
+                <div><dt>⌘/Ctrl + Shift + Z</dt><dd>다시 실행</dd></div>
+                <div><dt>⌘/Ctrl + C / V</dt><dd>가구 복사/붙여넣기</dd></div>
+                <div><dt>Delete</dt><dd>선택 가구 삭제</dd></div>
+                <div><dt>Arrow</dt><dd>1px 또는 스냅 단위 이동</dd></div>
+                <div><dt>Shift + Arrow</dt><dd>24px 이동</dd></div>
+                <div><dt>R</dt><dd>90도 회전</dd></div>
+                <div><dt>S</dt><dd>스냅 켜기/끄기</dd></div>
+                <div><dt>Space + Drag</dt><dd>캔버스 이동</dd></div>
+              </dl>
+            </div>
+          )}
+        </div>
         <div className="saved-layouts-dropdown">
-          <button type="button" className="ghost-button" onClick={() => setIsOpen(!isOpen)}>
-            저장된 배치안 ▼
+          <button type="button" className="ghost-button" onClick={handleSavedLayoutsToggle}>
+            저장된 도면
           </button>
           
           {isOpen && (
@@ -170,8 +215,17 @@ export function TopBar({
             </div>
           )}
         </div>
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onSaveCurrent}
+          disabled={!currentLayoutId || !hasUnsavedChanges}
+          title={currentLayoutId ? '현재 선택한 도면에 덮어씁니다.' : '새 저장은 우측 패널에서 이름을 지정해 진행합니다.'}
+        >
+          저장하기
+        </button>
         <button type="button" className="ghost-button" onClick={onReset}>
-          Reset
+          초기화
         </button>
       </div>
     </header>

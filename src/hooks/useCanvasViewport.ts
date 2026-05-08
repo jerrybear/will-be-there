@@ -8,6 +8,11 @@ interface PanStart {
   panY: number;
 }
 
+interface PanPosition {
+  x: number;
+  y: number;
+}
+
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 const ZOOM_STEP = 0.2;
@@ -17,12 +22,28 @@ function clampZoom(value: number) {
   return Math.max(MIN_ZOOM, Math.min(value, MAX_ZOOM));
 }
 
-export function useCanvasViewport() {
+export function useCanvasViewport(contentWidth: number, contentHeight: number) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const panStartRef = useRef<PanStart | null>(null);
   const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [pan, setPan] = useState<PanPosition>({ x: 0, y: 0 });
   const [isSpaceDown, setIsSpaceDown] = useState(false);
+
+  const getBoundedPan = (shell: HTMLElement, nextZoom: number, nextPan: PanPosition) => {
+    const scaledWidth = contentWidth * nextZoom;
+    const scaledHeight = contentHeight * nextZoom;
+
+    const x =
+      scaledWidth <= shell.clientWidth
+        ? Math.round((shell.clientWidth - scaledWidth) / 2)
+        : Math.min(0, Math.max(shell.clientWidth - scaledWidth, nextPan.x));
+    const y =
+      scaledHeight <= shell.clientHeight
+        ? Math.round((shell.clientHeight - scaledHeight) / 2)
+        : Math.min(0, Math.max(shell.clientHeight - scaledHeight, nextPan.y));
+
+    return { x, y };
+  };
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -66,10 +87,10 @@ export function useCanvasViewport() {
             const localX = (cursorX - previousPan.x) / previousZoom;
             const localY = (cursorY - previousPan.y) / previousZoom;
 
-            return {
+            return getBoundedPan(shell, nextZoom, {
               x: cursorX - localX * nextZoom,
               y: cursorY - localY * nextZoom,
-            };
+            });
           });
 
           return nextZoom;
@@ -77,16 +98,18 @@ export function useCanvasViewport() {
         return;
       }
 
-      setPan((previousPan) => ({
-        x: previousPan.x - event.deltaX,
-        y: previousPan.y - event.deltaY,
-      }));
+      setPan((previousPan) =>
+        getBoundedPan(shell, zoom, {
+          x: previousPan.x - event.deltaX,
+          y: previousPan.y - event.deltaY,
+        }),
+      );
     };
 
     shell.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => shell.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [contentHeight, contentWidth, zoom]);
 
   const beginPan = (event: ReactPointerEvent<Element>) => {
     if (event.button !== 1 && !isSpaceDown) {
@@ -109,10 +132,18 @@ export function useCanvasViewport() {
       return;
     }
 
-    setPan({
-      x: panStartRef.current.panX + event.clientX - panStartRef.current.clientX,
-      y: panStartRef.current.panY + event.clientY - panStartRef.current.clientY,
-    });
+    const shell = shellRef.current;
+
+    if (!shell) {
+      return;
+    }
+
+    setPan(
+      getBoundedPan(shell, zoom, {
+        x: panStartRef.current.panX + event.clientX - panStartRef.current.clientX,
+        y: panStartRef.current.panY + event.clientY - panStartRef.current.clientY,
+      }),
+    );
   };
 
   const endPan = (event: ReactPointerEvent<Element>) => {
@@ -125,16 +156,44 @@ export function useCanvasViewport() {
   };
 
   const zoomIn = () => {
-    setZoom((currentZoom) => clampZoom(currentZoom + ZOOM_STEP));
+    const shell = shellRef.current;
+    const nextZoom = clampZoom(zoom + ZOOM_STEP);
+    setZoom(nextZoom);
+
+    if (shell) {
+      setPan((currentPan) => getBoundedPan(shell, nextZoom, currentPan));
+    }
   };
 
   const zoomOut = () => {
-    setZoom((currentZoom) => clampZoom(currentZoom - ZOOM_STEP));
+    const shell = shellRef.current;
+    const nextZoom = clampZoom(zoom - ZOOM_STEP);
+    setZoom(nextZoom);
+
+    if (shell) {
+      setPan((currentPan) => getBoundedPan(shell, nextZoom, currentPan));
+    }
+  };
+
+  const centerViewport = (nextZoom = zoom) => {
+    const shell = shellRef.current;
+
+    if (!shell) {
+      return;
+    }
+
+    setPan(
+      getBoundedPan(shell, nextZoom, {
+        x: Math.round((shell.clientWidth - contentWidth * nextZoom) / 2),
+        y: Math.round((shell.clientHeight - contentHeight * nextZoom) / 2),
+      }),
+    );
   };
 
   const resetViewport = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
+    const nextZoom = 1;
+    setZoom(nextZoom);
+    centerViewport(nextZoom);
   };
 
   return {
@@ -147,6 +206,7 @@ export function useCanvasViewport() {
     endPan,
     zoomIn,
     zoomOut,
+    centerViewport,
     resetViewport,
   };
 }

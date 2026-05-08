@@ -6,7 +6,25 @@ import { createRoomSceneObjects, toWorldLength } from '../utils/threeScene';
 interface Preview3DSceneProps {
   room: Room;
   items: PlacedFurniture[];
+  selectedId: string | null;
 }
+
+type CameraPreset = 'fit' | 'top' | 'corner' | 'eye';
+type LightPreset = 'soft' | 'bright' | 'side' | 'overhead';
+
+const cameraPresets: Record<CameraPreset, { label: string; yaw: number; pitch: number; distance: number }> = {
+  fit: { label: '전체', yaw: -0.72, pitch: 0.72, distance: 1.82 },
+  top: { label: '상단', yaw: -0.72, pitch: 1.16, distance: 1.72 },
+  corner: { label: '사선', yaw: -0.95, pitch: 0.62, distance: 1.62 },
+  eye: { label: '눈높이', yaw: -0.5, pitch: 0.38, distance: 1.34 },
+};
+
+const lightPresets: Record<LightPreset, { label: string; azimuth: number; elevation: number }> = {
+  soft: { label: '기본', azimuth: 135, elevation: 45 },
+  bright: { label: '밝게', azimuth: 110, elevation: 60 },
+  side: { label: '측광', azimuth: 20, elevation: 30 },
+  overhead: { label: '상부', azimuth: 180, elevation: 78 },
+};
 
 function applyDirectionalLightPosition(
   light: THREE.DirectionalLight,
@@ -26,12 +44,14 @@ function applyDirectionalLightPosition(
   );
 }
 
-export function Preview3DScene({ room, items }: Preview3DSceneProps) {
+export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
   
+  const [cameraPreset, setCameraPreset] = useState<CameraPreset>('fit');
   const [lightAzimuth, setLightAzimuth] = useState(135);
   const [lightElevation, setLightElevation] = useState(45);
+  const [activeLightPreset, setActiveLightPreset] = useState<LightPreset | null>('soft');
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -46,7 +66,7 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
@@ -65,7 +85,7 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
     directionalLightRef.current = directionalLight;
 
     const group = new THREE.Group();
-    createRoomSceneObjects(room, items).forEach((object) => group.add(object));
+    createRoomSceneObjects(room, items, selectedId).forEach((object) => group.add(object));
     scene.add(group);
 
     const resize = () => {
@@ -88,9 +108,10 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
     let isDragging = false;
     let previousX = 0;
     let previousY = 0;
-    let yaw = -0.72;
-    let pitch = 0.72;
-    let distance = roomSpan * 1.82;
+    const initialCamera = cameraPresets[cameraPreset];
+    let yaw = initialCamera.yaw;
+    let pitch = initialCamera.pitch;
+    let distance = roomSpan * initialCamera.distance;
 
     const updateCamera = () => {
       const clampedPitch = Math.max(0.34, Math.min(1.18, pitch));
@@ -160,13 +181,20 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
       mount.removeChild(renderer.domElement);
       directionalLightRef.current = null;
     };
-  }, [items, room]);
+  }, [cameraPreset, items, room, selectedId]);
 
   useEffect(() => {
     if (directionalLightRef.current) {
       applyDirectionalLightPosition(directionalLightRef.current, room, lightAzimuth, lightElevation);
     }
   }, [lightAzimuth, lightElevation, room.width, room.height]);
+
+  const applyLightPreset = (preset: LightPreset) => {
+    const nextPreset = lightPresets[preset];
+    setActiveLightPreset(preset);
+    setLightAzimuth(nextPreset.azimuth);
+    setLightElevation(nextPreset.elevation);
+  };
 
   return (
     <section className="panel preview-panel" style={{ position: 'relative' }}>
@@ -177,8 +205,39 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
 
       <div className="preview-scene" ref={mountRef} />
       
-      <div className="light-controls-panel">
-        <h3 className="light-controls-title">조명 설정</h3>
+      <div className="scene-controls-panel">
+        <section className="scene-control-section">
+          <h3 className="light-controls-title">카메라</h3>
+          <div className="preset-button-grid">
+            {(Object.entries(cameraPresets) as Array<[CameraPreset, typeof cameraPresets[CameraPreset]]>).map(([preset, config]) => (
+              <button
+                key={preset}
+                type="button"
+                className={cameraPreset === preset ? 'is-active' : ''}
+                onClick={() => setCameraPreset(preset)}
+              >
+                {config.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="scene-control-section">
+          <h3 className="light-controls-title">조명</h3>
+          <div className="preset-button-grid">
+            {(Object.entries(lightPresets) as Array<[LightPreset, typeof lightPresets[LightPreset]]>).map(([preset, config]) => (
+              <button
+                key={preset}
+                type="button"
+                className={activeLightPreset === preset ? 'is-active' : ''}
+                onClick={() => applyLightPreset(preset)}
+              >
+                {config.label}
+              </button>
+            ))}
+          </div>
+        </section>
+
         <div className="control-group">
           <label htmlFor="lightAzimuth">
             <span>방향</span>
@@ -190,7 +249,10 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
             min="0" 
             max="360" 
             value={lightAzimuth} 
-            onChange={(e) => setLightAzimuth(Number(e.target.value))} 
+            onChange={(e) => {
+              setActiveLightPreset(null);
+              setLightAzimuth(Number(e.target.value));
+            }} 
           />
         </div>
         <div className="control-group">
@@ -204,7 +266,10 @@ export function Preview3DScene({ room, items }: Preview3DSceneProps) {
             min="10" 
             max="80" 
             value={lightElevation} 
-            onChange={(e) => setLightElevation(Number(e.target.value))} 
+            onChange={(e) => {
+              setActiveLightPreset(null);
+              setLightElevation(Number(e.target.value));
+            }} 
           />
         </div>
       </div>
