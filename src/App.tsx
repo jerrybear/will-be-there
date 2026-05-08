@@ -32,6 +32,7 @@ export default function App() {
     canUndo,
     canRedo,
     addFurniture,
+    addCustomFurnitureTemplate,
     selectFurniture,
     beginFurnitureMove,
     moveFurniture,
@@ -106,7 +107,7 @@ export default function App() {
       />
 
       <main className="workspace-grid">
-        <FurniturePalette items={catalog} onAdd={addFurniture} />
+        <FurniturePalette items={catalog} onAdd={addFurniture} onAddCustomItem={addCustomFurnitureTemplate} />
         {viewMode === '2d' ? (
           <RoomCanvas
             room={room}

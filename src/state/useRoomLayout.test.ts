@@ -3,12 +3,21 @@ import { renderHook, act } from '@testing-library/react';
 import { useRoomLayout } from './useRoomLayout';
 
 describe('useRoomLayout hook', () => {
+  let storageState: Record<string, string>;
+
   beforeEach(() => {
+    storageState = {};
     vi.stubGlobal('localStorage', {
-      getItem: vi.fn().mockReturnValue(null),
-      setItem: vi.fn(),
-      clear: vi.fn(),
-      removeItem: vi.fn(),
+      getItem: vi.fn((key: string) => storageState[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => {
+        storageState[key] = value;
+      }),
+      clear: vi.fn(() => {
+        storageState = {};
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete storageState[key];
+      }),
     });
     vi.clearAllMocks();
   });
@@ -30,6 +39,7 @@ describe('useRoomLayout hook', () => {
     
     expect(result.current.items).toHaveLength(1);
     expect(result.current.items[0].templateId).toBe('bed');
+    expect(result.current.items[0].threeModel).toBe('bed_frame');
     expect(result.current.selectedId).toBe(result.current.items[0].id);
   });
 
@@ -112,5 +122,80 @@ describe('useRoomLayout hook', () => {
     
     expect(result.current.items).toHaveLength(0);
     expect(result.current.selectedId).toBeNull();
+  });
+
+  it('should add a custom furniture template to the catalog', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addCustomFurnitureTemplate({
+        label: '협탁',
+        category: 'storage',
+        width: 48,
+        height: 40,
+        objectHeight: 52,
+        color: '#123456',
+      });
+    });
+
+    const customItem = result.current.catalog.find((item) => item.label === '협탁');
+
+    expect(customItem).toBeTruthy();
+    expect(customItem?.kind).toBe('furniture');
+    expect(customItem?.isWallAttached).toBe(false);
+    expect(customItem?.threeModel).toBe('box');
+  });
+
+  it('should place furniture created from a custom template', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    let customTemplateId: string | null = null;
+
+    act(() => {
+      customTemplateId = result.current.addCustomFurnitureTemplate({
+        label: '협탁',
+        category: 'storage',
+        width: 48,
+        height: 40,
+        objectHeight: 52,
+        color: '#123456',
+      });
+    });
+
+    expect(customTemplateId).toBeTruthy();
+
+    act(() => {
+      result.current.addFurniture(customTemplateId as string);
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].templateId).toBe(customTemplateId);
+    expect(result.current.items[0].label).toBe('협탁');
+    expect(result.current.items[0].threeModel).toBe('box');
+  });
+
+  it('should load custom furniture catalog from local storage on init', () => {
+    storageState['virtual-room-layout:custom-furniture-catalog'] = JSON.stringify({
+      schemaVersion: 5,
+      items: [
+        {
+          id: 'custom-furniture-seed',
+          label: '커스텀 선반',
+          category: 'storage',
+          width: 80,
+          height: 32,
+          objectHeight: 180,
+          color: '#654321',
+          kind: 'furniture',
+          threeModel: 'box',
+          elevation: 0,
+          isWallAttached: false,
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useRoomLayout());
+
+    expect(result.current.catalog.some((item) => item.id === 'custom-furniture-seed')).toBe(true);
   });
 });

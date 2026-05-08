@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { FurnitureGeometryUpdate, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
+import type { CustomFurnitureTemplate, CustomFurnitureTemplateDraft, FurnitureGeometryUpdate, FurnitureTemplate, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
 import {
   createRectRoom,
@@ -15,7 +15,7 @@ import {
   rectFromItem,
   rectsOverlap,
 } from '../utils/geometry';
-import { loadWorkspaceState, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
+import { loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureCatalog, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
 
 const DEFAULT_ROOM: Room = createRectRoom(720, 480);
 
@@ -305,6 +305,10 @@ function createObstacleId() {
   return `obstacle-${id}`;
 }
 
+function createCustomFurnitureTemplateId() {
+  return `custom-furniture-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+}
+
 function getNextFurnitureId(itemsValue: PlacedFurniture[]) {
   const maxId = itemsValue.reduce((maxValue, item) => {
     const match = item.id.match(/^furniture-(\d+)$/);
@@ -342,6 +346,7 @@ function normalizeLayoutForComparison(roomValue: Room, itemsValue: PlacedFurnitu
 
 export function useRoomLayout() {
   const initialWorkspaceState = useMemo(() => loadWorkspaceState(), []);
+  const initialCustomFurnitureCatalog = useMemo(() => loadCustomFurnitureCatalog(), []);
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -349,6 +354,7 @@ export function useRoomLayout() {
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
   const [savedRooms, setSavedRooms] = useState<SavedRoom[]>(() => initialWorkspaceState.rooms);
   const [savedLayouts, setSavedLayouts] = useState<SavedLayout[]>(() => initialWorkspaceState.layouts);
+  const [customFurnitureCatalog, setCustomFurnitureCatalog] = useState<CustomFurnitureTemplate[]>(() => initialCustomFurnitureCatalog);
   const [currentRoomId, setCurrentRoomId] = useState<string | null>(null);
   const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
   const [pastLayouts, setPastLayouts] = useState<LayoutHistorySnapshot[]>([]);
@@ -367,6 +373,11 @@ export function useRoomLayout() {
   const currentRoom = useMemo(
     () => savedRooms.find((savedRoom) => savedRoom.id === currentRoomId) ?? null,
     [currentRoomId, savedRooms],
+  );
+
+  const catalog = useMemo<FurnitureTemplate[]>(
+    () => [...furnitureCatalog, ...customFurnitureCatalog],
+    [customFurnitureCatalog],
   );
 
   const hasUnsavedChanges = useMemo(() => {
@@ -475,7 +486,7 @@ export function useRoomLayout() {
   };
 
   const addFurniture = (templateId: string) => {
-    const template = furnitureCatalog.find((item) => item.id === templateId);
+    const template = catalog.find((item) => item.id === templateId);
 
     if (!template) {
       return;
@@ -490,6 +501,7 @@ export function useRoomLayout() {
       label: template.label,
       color: template.color,
       kind: template.kind,
+      threeModel: template.threeModel,
       objectHeight: template.objectHeight,
       elevation: template.elevation ?? 0,
       width: template.width,
@@ -504,6 +516,36 @@ export function useRoomLayout() {
 
     setItems((currentItems) => [...currentItems, nextItem]);
     setSelectedId(nextItem.id);
+  };
+
+  const addCustomFurnitureTemplate = (template: CustomFurnitureTemplateDraft) => {
+    const trimmedLabel = template.label.trim();
+
+    if (!trimmedLabel) {
+      return null;
+    }
+
+    const nextTemplate: CustomFurnitureTemplate = {
+      id: createCustomFurnitureTemplateId(),
+      label: trimmedLabel,
+      category: template.category,
+      width: normalizeFurnitureSize(template.width, MAX_ROOM_WIDTH),
+      height: normalizeFurnitureSize(template.height, MAX_ROOM_HEIGHT),
+      objectHeight: clamp(Math.round(template.objectHeight), MIN_OBJECT_HEIGHT, MAX_OBJECT_HEIGHT),
+      color: normalizeFurnitureColor(template.color),
+      kind: 'furniture',
+      threeModel: 'box',
+      elevation: 0,
+      isWallAttached: false,
+    };
+
+    setCustomFurnitureCatalog((currentTemplates) => {
+      const nextTemplates = [...currentTemplates, nextTemplate];
+      persistCustomFurnitureCatalog(nextTemplates);
+      return nextTemplates;
+    });
+
+    return nextTemplate.id;
   };
 
   const selectFurniture = (id: string | null) => {
@@ -1027,7 +1069,8 @@ export function useRoomLayout() {
 
   return {
     room,
-    catalog: furnitureCatalog,
+    catalog,
+    customFurnitureCatalog,
     items,
     selectedId,
     selectedItem,
@@ -1043,6 +1086,7 @@ export function useRoomLayout() {
     canUndo: pastLayouts.length > 0,
     canRedo: futureLayouts.length > 0,
     addFurniture,
+    addCustomFurnitureTemplate,
     selectFurniture,
     beginFurnitureMove,
     moveFurniture,

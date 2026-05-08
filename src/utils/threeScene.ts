@@ -342,40 +342,227 @@ export function createObstacleMeshes(room: Room) {
   });
 }
 
-export function createItemMesh(room: Room, item: PlacedFurniture, isSelected = false) {
-  const width = toWorldLength(item.width);
-  const depth = toWorldLength(item.height);
-  const height = Math.max(toWorldLength(item.objectHeight), toWorldLength(4));
-  const elevation = toWorldLength(item.elevation);
-  const placementRect = getItemPlacementRect(item, item.x, item.y);
-  const geometry = new THREE.BoxGeometry(width, height, depth);
-  const material = new THREE.MeshStandardMaterial({
+function createFurnitureMaterial(item: PlacedFurniture, isSelected: boolean) {
+  return new THREE.MeshStandardMaterial({
     color: new THREE.Color(item.color),
     emissive: new THREE.Color(isSelected ? 0x1d4ed8 : 0x000000),
     emissiveIntensity: isSelected ? 0.28 : 0,
     roughness: 0.72,
     metalness: 0.03,
   });
-  const mesh = new THREE.Mesh(geometry, material);
+}
 
-  mesh.position.set(
+function addSelectionOutline(group: THREE.Group, width: number, height: number, depth: number) {
+  const outline = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.BoxGeometry(width, height, depth)),
+    new THREE.LineBasicMaterial({ color: 0x2563eb }),
+  );
+  group.add(outline);
+}
+
+function createDeskNeominGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const mainMaterial = createFurnitureMaterial(item, isSelected);
+  const accentMaterial = new THREE.MeshStandardMaterial({
+    color: 0x4b5563,
+    roughness: 0.85,
+    metalness: 0.06,
+  });
+
+  const topThickness = Math.max(height * 0.08, toWorldLength(3));
+  const sideThickness = Math.max(width * 0.08, toWorldLength(3));
+  const modestyThickness = Math.max(depth * 0.06, toWorldLength(2));
+
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width, topThickness, depth), mainMaterial);
+  top.position.y = height / 2 - topThickness / 2;
+  group.add(top);
+
+  const leftPanel = new THREE.Mesh(new THREE.BoxGeometry(sideThickness, height - topThickness, depth), mainMaterial);
+  leftPanel.position.set(-width / 2 + sideThickness / 2, -topThickness / 2, 0);
+  group.add(leftPanel);
+
+  const rightPanel = leftPanel.clone();
+  rightPanel.position.x = width / 2 - sideThickness / 2;
+  group.add(rightPanel);
+
+  const modesty = new THREE.Mesh(
+    new THREE.BoxGeometry(width - sideThickness * 2.4, height * 0.42, modestyThickness),
+    accentMaterial,
+  );
+  modesty.position.set(0, -height * 0.12, depth / 2 - modestyThickness / 2);
+  group.add(modesty);
+
+  if (isSelected) {
+    addSelectionOutline(group, width, height, depth);
+  }
+
+  return group;
+}
+
+function createDeskFourLegGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const topMaterial = createFurnitureMaterial(item, isSelected);
+  const legMaterial = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    roughness: 0.78,
+    metalness: 0.08,
+  });
+
+  const topThickness = Math.max(height * 0.08, toWorldLength(3));
+  const legSize = Math.max(Math.min(width, depth) * 0.08, toWorldLength(3));
+  const legHeight = Math.max(height - topThickness, toWorldLength(12));
+  const offsetX = width / 2 - legSize;
+  const offsetZ = depth / 2 - legSize;
+
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width, topThickness, depth), topMaterial);
+  top.position.y = height / 2 - topThickness / 2;
+  group.add(top);
+
+  const legGeometry = new THREE.BoxGeometry(legSize, legHeight, legSize);
+  [
+    [-offsetX, -topThickness / 2, -offsetZ],
+    [offsetX, -topThickness / 2, -offsetZ],
+    [-offsetX, -topThickness / 2, offsetZ],
+    [offsetX, -topThickness / 2, offsetZ],
+  ].forEach(([x, y, z]) => {
+    const leg = new THREE.Mesh(legGeometry, legMaterial);
+    leg.position.set(x, y, z);
+    group.add(leg);
+  });
+
+  if (isSelected) {
+    addSelectionOutline(group, width, height, depth);
+  }
+
+  return group;
+}
+
+function createBedFrameGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const frameMaterial = createFurnitureMaterial(item, isSelected);
+  const mattressMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.95,
+    metalness: 0.01,
+  });
+
+  const frameHeight = Math.max(height * 0.38, toWorldLength(10));
+  const mattressHeight = Math.max(height * 0.42, toWorldLength(8));
+  const headboardHeight = Math.max(height * 1.25, toWorldLength(28));
+  const headboardThickness = Math.max(depth * 0.06, toWorldLength(3));
+
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(width, frameHeight, depth), frameMaterial);
+  frame.position.y = -height / 2 + frameHeight / 2;
+  group.add(frame);
+
+  const mattress = new THREE.Mesh(new THREE.BoxGeometry(width * 0.94, mattressHeight, depth * 0.92), mattressMaterial);
+  mattress.position.y = -height / 2 + frameHeight + mattressHeight / 2 - toWorldLength(1);
+  group.add(mattress);
+
+  const headboard = new THREE.Mesh(new THREE.BoxGeometry(width, headboardHeight, headboardThickness), frameMaterial);
+  headboard.position.set(0, -height / 2 + headboardHeight / 2, -depth / 2 + headboardThickness / 2);
+  group.add(headboard);
+
+  if (isSelected) {
+    addSelectionOutline(group, width, Math.max(headboardHeight, height), depth);
+  }
+
+  return group;
+}
+
+function createSofaCushionGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const baseMaterial = createFurnitureMaterial(item, isSelected);
+  const cushionMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(item.color).offsetHSL(0, -0.04, 0.08),
+    roughness: 0.84,
+    metalness: 0.02,
+  });
+
+  const baseHeight = Math.max(height * 0.34, toWorldLength(10));
+  const seatHeight = Math.max(height * 0.28, toWorldLength(7));
+  const backHeight = Math.max(height * 0.58, toWorldLength(14));
+  const armWidth = Math.max(width * 0.12, toWorldLength(6));
+
+  const base = new THREE.Mesh(new THREE.BoxGeometry(width, baseHeight, depth), baseMaterial);
+  base.position.y = -height / 2 + baseHeight / 2;
+  group.add(base);
+
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(width - armWidth * 2, seatHeight, depth * 0.7), cushionMaterial);
+  seat.position.y = -height / 2 + baseHeight + seatHeight / 2;
+  group.add(seat);
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(width, backHeight, depth * 0.18), baseMaterial);
+  back.position.set(0, -height / 2 + backHeight / 2 + baseHeight * 0.55, -depth / 2 + depth * 0.09);
+  group.add(back);
+
+  const armGeometry = new THREE.BoxGeometry(armWidth, backHeight * 0.82, depth * 0.88);
+  const leftArm = new THREE.Mesh(armGeometry, baseMaterial);
+  leftArm.position.set(-width / 2 + armWidth / 2, -height / 2 + armGeometry.parameters.height / 2 + baseHeight * 0.35, 0);
+  group.add(leftArm);
+
+  const rightArm = leftArm.clone();
+  rightArm.position.x = width / 2 - armWidth / 2;
+  group.add(rightArm);
+
+  if (isSelected) {
+    addSelectionOutline(group, width, Math.max(backHeight, height), depth);
+  }
+
+  return group;
+}
+
+function createBoxGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const geometry = new THREE.BoxGeometry(width, height, depth);
+  const mesh = new THREE.Mesh(geometry, createFurnitureMaterial(item, isSelected));
+  group.add(mesh);
+
+  if (isSelected) {
+    addSelectionOutline(group, width, height, depth);
+  }
+
+  return group;
+}
+
+function createFurnitureGroupByModel(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  switch (item.threeModel) {
+    case 'desk_neomin':
+      return createDeskNeominGroup(item, width, depth, height, isSelected);
+    case 'desk_four_leg':
+      return createDeskFourLegGroup(item, width, depth, height, isSelected);
+    case 'bed_frame':
+      return createBedFrameGroup(item, width, depth, height, isSelected);
+    case 'sofa_cushion':
+      return createSofaCushionGroup(item, width, depth, height, isSelected);
+    case 'box':
+    default:
+      return createBoxGroup(item, width, depth, height, isSelected);
+  }
+}
+
+export function createItemMesh(room: Room, item: PlacedFurniture, isSelected = false) {
+  const width = toWorldLength(item.width);
+  const depth = toWorldLength(item.height);
+  const height = Math.max(toWorldLength(item.objectHeight), toWorldLength(4));
+  const elevation = toWorldLength(item.elevation);
+  const placementRect = getItemPlacementRect(item, item.x, item.y);
+  const group = createFurnitureGroupByModel(item, width, depth, height, isSelected);
+
+  group.position.set(
     toWorldX(room, placementRect.x + placementRect.width / 2),
     elevation + height / 2,
     toWorldZ(room, placementRect.y + placementRect.height / 2),
   );
-  mesh.rotation.y = -item.rotation * Math.PI / 180;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
+  group.rotation.y = -item.rotation * Math.PI / 180;
+  group.traverse((object) => {
+    if (object instanceof THREE.Mesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
 
-  if (isSelected) {
-    const outline = new THREE.LineSegments(
-      new THREE.EdgesGeometry(geometry),
-      new THREE.LineBasicMaterial({ color: 0x2563eb }),
-    );
-    mesh.add(outline);
-  }
-
-  return mesh;
+  return group;
 }
 
 export function createRoomSceneObjects(room: Room, items: PlacedFurniture[], selectedId: string | null = null) {

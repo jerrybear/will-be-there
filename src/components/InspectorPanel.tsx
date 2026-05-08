@@ -76,6 +76,22 @@ function formatElementKind(kind: PlacedFurniture['kind']) {
   return '가구';
 }
 
+function formatThreeModel(model: PlacedFurniture['threeModel']) {
+  switch (model) {
+    case 'desk_neomin':
+      return '네오민 책상';
+    case 'desk_four_leg':
+      return '4다리 책상';
+    case 'bed_frame':
+      return '프레임 침대';
+    case 'sofa_cushion':
+      return '쿠션 소파';
+    case 'box':
+    default:
+      return '기본 박스';
+  }
+}
+
 function formatRoomJson(room: Room) {
   const shape = getRoomShape(room);
 
@@ -1000,6 +1016,10 @@ export function InspectorPanel({
         <div>
           <dt>요소 종류</dt>
           <dd>{formatElementKind(item.kind)}</dd>
+        </div>
+        <div>
+          <dt>3D 타입</dt>
+          <dd>{formatThreeModel(item.threeModel)}</dd>
         </div>
         <div>
           <dt>설치 높이</dt>

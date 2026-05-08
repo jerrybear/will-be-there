@@ -4,6 +4,7 @@ export type LayoutElementKind = 'furniture' | 'door' | 'window';
 export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
 export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
+export type FurnitureThreeModel = 'box' | 'desk_neomin' | 'desk_four_leg' | 'bed_frame' | 'sofa_cushion';
 
 export interface Size {
   width: number;
@@ -47,10 +48,14 @@ export interface FurnitureTemplate extends Size {
   category: FurnitureCategory;
   color: string;
   kind: LayoutElementKind;
+  threeModel: FurnitureThreeModel;
   objectHeight: number;
   elevation?: number;
   isWallAttached?: boolean;
 }
+
+export type CustomFurnitureTemplate = FurnitureTemplate;
+export type CustomFurnitureTemplateDraft = Omit<CustomFurnitureTemplate, 'id' | 'kind' | 'threeModel' | 'elevation' | 'isWallAttached'>;
 
 export interface PlacedFurniture extends Size, Position {
   id: string;
@@ -58,6 +63,7 @@ export interface PlacedFurniture extends Size, Position {
   label: string;
   color: string;
   kind: LayoutElementKind;
+  threeModel: FurnitureThreeModel;
   objectHeight: number;
   elevation: number;
   rotation: Rotation;

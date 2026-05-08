@@ -1,9 +1,10 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { LayoutElementKind, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
+import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
 import { createRectRoomShape, normalizeRoomShapePointIds } from '../utils/geometry';
 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
+const CUSTOM_FURNITURE_STORAGE_KEY = 'virtual-room-layout:custom-furniture-catalog';
 export const CURRENT_SCHEMA_VERSION = 5;
 
 interface StoredLayoutsPayload {
@@ -19,6 +20,11 @@ interface StoredRoomsPayload {
 interface WorkspaceState {
   rooms: SavedRoom[];
   layouts: SavedLayout[];
+}
+
+interface StoredCustomFurniturePayload {
+  schemaVersion: number;
+  items: CustomFurnitureTemplate[];
 }
 
 type LegacySavedLayout = {
@@ -94,6 +100,43 @@ function isStoredRoomsPayload(value: unknown): value is StoredRoomsPayload {
   return typeof draft.schemaVersion === 'number' && Array.isArray(draft.rooms);
 }
 
+function isFurnitureCategory(value: unknown): value is FurnitureCategory {
+  return value === 'doors' || value === 'windows' || value === 'seating' || value === 'tables' || value === 'storage';
+}
+
+function isFurnitureThreeModel(value: unknown): value is FurnitureThreeModel {
+  return value === 'box' || value === 'desk_neomin' || value === 'desk_four_leg' || value === 'bed_frame' || value === 'sofa_cushion';
+}
+
+function isCustomFurnitureTemplate(value: unknown): value is CustomFurnitureTemplate {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const draft = value as Partial<CustomFurnitureTemplate>;
+
+  return (
+    typeof draft.id === 'string' &&
+    typeof draft.label === 'string' &&
+    isFurnitureCategory(draft.category) &&
+    typeof draft.width === 'number' &&
+    typeof draft.height === 'number' &&
+    typeof draft.objectHeight === 'number' &&
+    typeof draft.color === 'string' &&
+    draft.kind === 'furniture' &&
+    isFurnitureThreeModel(draft.threeModel)
+  );
+}
+
+function isStoredCustomFurniturePayload(value: unknown): value is StoredCustomFurniturePayload {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const draft = value as Partial<StoredCustomFurniturePayload>;
+  return typeof draft.schemaVersion === 'number' && Array.isArray(draft.items);
+}
+
 function inferElementKind(item: Partial<PlacedFurniture>): LayoutElementKind {
   if (item.kind) {
     return item.kind;
@@ -121,6 +164,7 @@ function migratePlacedFurniture(item: PlacedFurniture): PlacedFurniture {
   return {
     ...item,
     kind,
+    threeModel: item.threeModel ?? catalogDefaults?.threeModel ?? 'box',
     objectHeight: item.objectHeight ?? catalogDefaults?.objectHeight ?? (kind === 'door' ? 210 : kind === 'window' ? 100 : 70),
     elevation: item.elevation ?? catalogDefaults?.elevation ?? 0,
     isWallAttached: item.isWallAttached ?? (kind === 'door' || kind === 'window'),
@@ -129,6 +173,16 @@ function migratePlacedFurniture(item: PlacedFurniture): PlacedFurniture {
     doorHinge: item.doorHinge,
     doorSwingDir: item.doorSwingDir,
     showDoorSwing: item.showDoorSwing ?? false,
+  };
+}
+
+function migrateCustomFurnitureTemplate(item: CustomFurnitureTemplate): CustomFurnitureTemplate {
+  return {
+    ...item,
+    kind: 'furniture',
+    threeModel: item.threeModel ?? 'box',
+    elevation: 0,
+    isWallAttached: false,
   };
 }
 
@@ -245,6 +299,13 @@ export function createStoredLayoutsPayload(layouts: SavedLayout[]): StoredLayout
   };
 }
 
+export function createStoredCustomFurniturePayload(items: CustomFurnitureTemplate[]): StoredCustomFurniturePayload {
+  return {
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    items: items.map(migrateCustomFurnitureTemplate),
+  };
+}
+
 export function loadWorkspaceState(): WorkspaceState {
   if (!canUseStorage()) {
     return {
@@ -255,6 +316,24 @@ export function loadWorkspaceState(): WorkspaceState {
 
   const rooms = parseSavedRoomsPayload(window.localStorage.getItem(ROOM_STORAGE_KEY) ?? '[]');
   return parseSavedLayoutsPayload(window.localStorage.getItem(LAYOUT_STORAGE_KEY) ?? '[]', rooms);
+}
+
+export function loadCustomFurnitureCatalog(): CustomFurnitureTemplate[] {
+  if (!canUseStorage()) {
+    return [];
+  }
+
+  const parsedValue = readJson(window.localStorage.getItem(CUSTOM_FURNITURE_STORAGE_KEY));
+
+  if (isStoredCustomFurniturePayload(parsedValue)) {
+    return parsedValue.items.filter(isCustomFurnitureTemplate).map(migrateCustomFurnitureTemplate);
+  }
+
+  if (Array.isArray(parsedValue)) {
+    return parsedValue.filter(isCustomFurnitureTemplate).map(migrateCustomFurnitureTemplate);
+  }
+
+  return [];
 }
 
 export function persistSavedRooms(rooms: SavedRoom[]) {
@@ -271,4 +350,12 @@ export function persistSavedLayouts(layouts: SavedLayout[]) {
   }
 
   window.localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(createStoredLayoutsPayload(layouts)));
+}
+
+export function persistCustomFurnitureCatalog(items: CustomFurnitureTemplate[]) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(CUSTOM_FURNITURE_STORAGE_KEY, JSON.stringify(createStoredCustomFurniturePayload(items)));
 }
