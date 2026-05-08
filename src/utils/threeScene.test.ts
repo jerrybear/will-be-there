@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createRectRoom } from './geometry';
-import { createRoomSceneObjects } from './threeScene';
+import { applyWallVisibility, createRoomSceneObjects, getFrontWallSegmentId } from './threeScene';
 import type { PlacedFurniture, Room } from '../types/layout';
 
 function getFurnitureGroup(item: PlacedFurniture) {
@@ -49,5 +49,28 @@ describe('threeScene detailed models', () => {
     });
 
     expect(group.children.some((child) => child instanceof THREE.Mesh)).toBe(true);
+  });
+
+  it('selects only the nearest front wall for auto fade', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const cameraPosition = new THREE.Vector3(0, 1, 5);
+    const cameraForward = new THREE.Vector3(0, 0, -1);
+
+    expect(getFrontWallSegmentId(room, cameraPosition, cameraForward)).toBe('point-2-point-3');
+  });
+
+  it('applies fade opacity only to the chosen wall', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const wallObjects = createRoomSceneObjects(room, [], null).filter((object) => object.userData.wallSegmentId);
+
+    applyWallVisibility(wallObjects, 'point-2-point-3');
+
+    const fadedWall = wallObjects.find((object) => object.userData.wallSegmentId === 'point-2-point-3');
+    const solidWalls = wallObjects.filter((object) => object.userData.wallSegmentId !== 'point-2-point-3');
+
+    expect((fadedWall?.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBeCloseTo(0.28);
+    solidWalls.forEach((wall) => {
+      expect((wall.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBe(1);
+    });
   });
 });

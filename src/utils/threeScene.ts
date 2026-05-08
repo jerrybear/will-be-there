@@ -6,6 +6,7 @@ import type { WallSegment } from './geometry';
 const UNIT_SCALE = 0.01;
 const WALL_HEIGHT = 240;
 const WALL_THICKNESS = 6;
+const WALL_FADE_OPACITY = 0.28;
 
 export function toWorldX(room: Room, x: number) {
   return (x - room.width / 2) * UNIT_SCALE;
@@ -21,6 +22,14 @@ export function toWorldLength(value: number) {
 
 function toShapePoint(room: Room, point: Position) {
   return new THREE.Vector2(toWorldX(room, point.x), toWorldZ(room, point.y));
+}
+
+function getRoomCenterWorld(room: Room) {
+  const points = getRoomShape(room).points;
+  const averageX = points.reduce((sum, point) => sum + point.x, 0) / points.length;
+  const averageY = points.reduce((sum, point) => sum + point.y, 0) / points.length;
+
+  return new THREE.Vector3(toWorldX(room, averageX), 0, toWorldZ(room, averageY));
 }
 
 export function createFloorMesh(room: Room) {
@@ -274,6 +283,8 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
 
     const group = new THREE.Group();
     group.add(wallMesh);
+    group.userData.wallSegmentId = segment.id;
+    group.userData.wallMaterial = material;
 
     // Center the extruded shape
     wallMesh.position.set(-segmentLength / 2, 0, -wallThickness / 2);
@@ -309,6 +320,90 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
   }
 
   return meshes;
+}
+
+function getSegmentCenterWorld(room: Room, segment: WallSegment) {
+  return new THREE.Vector3(
+    toWorldX(room, (segment.start.x + segment.end.x) / 2),
+    0,
+    toWorldZ(room, (segment.start.y + segment.end.y) / 2),
+  );
+}
+
+function getInwardNormal(room: Room, segment: WallSegment) {
+  const start = new THREE.Vector3(toWorldX(room, segment.start.x), 0, toWorldZ(room, segment.start.y));
+  const end = new THREE.Vector3(toWorldX(room, segment.end.x), 0, toWorldZ(room, segment.end.y));
+  const direction = end.clone().sub(start).normalize();
+  const normalA = new THREE.Vector3(-direction.z, 0, direction.x);
+  const normalB = new THREE.Vector3(direction.z, 0, -direction.x);
+  const toCenter = getRoomCenterWorld(room).sub(getSegmentCenterWorld(room, segment));
+
+  return normalA.dot(toCenter) >= normalB.dot(toCenter) ? normalA.normalize() : normalB.normalize();
+}
+
+export function getFrontWallSegmentId(
+  room: Room,
+  cameraPosition: THREE.Vector3,
+  cameraForward: THREE.Vector3,
+) {
+  const normalizedForward = cameraForward.clone().normalize();
+  let bestSegmentId: string | null = null;
+  let bestProjectedDistance = Number.POSITIVE_INFINITY;
+  let bestAlignment = -1;
+
+  for (const segment of getRoomWallSegments(room)) {
+    const center = getSegmentCenterWorld(room, segment);
+    const toWall = center.clone().sub(cameraPosition);
+    const projectedDistance = toWall.dot(normalizedForward);
+
+    if (projectedDistance <= 0) {
+      continue;
+    }
+
+    const inwardNormal = getInwardNormal(room, segment);
+    const cameraSide = cameraPosition.clone().sub(center).dot(inwardNormal);
+
+    if (cameraSide >= 0) {
+      continue;
+    }
+
+    const alignment = toWall.clone().normalize().dot(normalizedForward);
+
+    if (alignment < 0.4) {
+      continue;
+    }
+
+    if (
+      projectedDistance < bestProjectedDistance - 0.0001 ||
+      (Math.abs(projectedDistance - bestProjectedDistance) <= 0.0001 && alignment > bestAlignment)
+    ) {
+      bestSegmentId = segment.id;
+      bestProjectedDistance = projectedDistance;
+      bestAlignment = alignment;
+    }
+  }
+
+  return bestSegmentId;
+}
+
+export function applyWallVisibility(
+  wallObjects: THREE.Object3D[],
+  fadedSegmentId: string | null,
+  fadeOpacity = WALL_FADE_OPACITY,
+) {
+  wallObjects.forEach((wallObject) => {
+    const material = wallObject.userData.wallMaterial as THREE.MeshStandardMaterial | undefined;
+
+    if (!material) {
+      return;
+    }
+
+    const isFaded = wallObject.userData.wallSegmentId === fadedSegmentId;
+    material.transparent = isFaded;
+    material.opacity = isFaded ? fadeOpacity : 1;
+    material.depthWrite = !isFaded;
+    material.needsUpdate = true;
+  });
 }
 
 function createObstacleMesh(room: Room, obstacle: RoomObstacle) {
@@ -568,10 +663,11 @@ export function createItemMesh(room: Room, item: PlacedFurniture, isSelected = f
 export function createRoomSceneObjects(room: Room, items: PlacedFurniture[], selectedId: string | null = null) {
   // Door/window items are rendered as wall openings, not as separate meshes
   const furnitureItems = items.filter((item) => item.kind === 'furniture');
+  const wallMeshes = createWallMeshes(room, items, selectedId);
 
   return [
     createFloorMesh(room),
-    ...createWallMeshes(room, items, selectedId),
+    ...wallMeshes,
     ...createObstacleMeshes(room),
     ...furnitureItems.map((item) => createItemMesh(room, item, item.id === selectedId)),
   ];

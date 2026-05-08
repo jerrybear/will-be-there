@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { PlacedFurniture, Room } from '../types/layout';
-import { createRoomSceneObjects, toWorldLength } from '../utils/threeScene';
+import { applyWallVisibility, createRoomSceneObjects, getFrontWallSegmentId, toWorldLength } from '../utils/threeScene';
 
 interface Preview3DSceneProps {
   room: Room;
@@ -85,8 +85,10 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
     directionalLightRef.current = directionalLight;
 
     const group = new THREE.Group();
-    createRoomSceneObjects(room, items, selectedId).forEach((object) => group.add(object));
+    const sceneObjects = createRoomSceneObjects(room, items, selectedId);
+    sceneObjects.forEach((object) => group.add(object));
     scene.add(group);
+    const wallObjects = sceneObjects.filter((object) => object.userData.wallSegmentId);
 
     const resize = () => {
       const { clientWidth, clientHeight } = mount;
@@ -125,6 +127,10 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
 
     const render = () => {
       updateCamera();
+      const cameraForward = new THREE.Vector3();
+      camera.getWorldDirection(cameraForward);
+      const fadedSegmentId = getFrontWallSegmentId(room, camera.position, cameraForward);
+      applyWallVisibility(wallObjects, fadedSegmentId);
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
     };
