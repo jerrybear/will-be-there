@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { CustomFurnitureTemplate, CustomFurnitureTemplateDraft, FurnitureGeometryUpdate, FurnitureTemplate, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
+import type { CustomFurnitureTemplate, CustomFurnitureTemplateDraft, FurnitureGeometryUpdate, FurnitureTemplate, LayoutNote, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
 import {
   createRectRoom,
@@ -19,10 +19,10 @@ import { loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureC
 
 const DEFAULT_ROOM: Room = createRectRoom(720, 480);
 
-const MIN_ROOM_WIDTH = 240;
-const MIN_ROOM_HEIGHT = 180;
-const MAX_ROOM_WIDTH = 1200;
-const MAX_ROOM_HEIGHT = 900;
+const MIN_ROOM_WIDTH = 1;
+const MIN_ROOM_HEIGHT = 1;
+const MAX_ROOM_WIDTH = Number.MAX_SAFE_INTEGER;
+const MAX_ROOM_HEIGHT = Number.MAX_SAFE_INTEGER;
 const MIN_FURNITURE_SIZE = 20;
 const MIN_OBJECT_HEIGHT = 1;
 const MAX_OBJECT_HEIGHT = 400;
@@ -32,6 +32,7 @@ const MAX_HISTORY_LENGTH = 80;
 interface LayoutHistorySnapshot {
   room: Room;
   items: PlacedFurniture[];
+  notes: LayoutNote[];
   selectedId: string | null;
   currentRoomId: string | null;
   currentLayoutId: string | null;
@@ -39,6 +40,7 @@ interface LayoutHistorySnapshot {
 
 let nextFurnitureId = 1;
 let nextObstacleId = 1;
+let nextNoteId = 1;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -309,6 +311,12 @@ function createCustomFurnitureTemplateId() {
   return `custom-furniture-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 }
 
+function createNoteId() {
+  const id = nextNoteId;
+  nextNoteId += 1;
+  return `note-${id}`;
+}
+
 function getNextFurnitureId(itemsValue: PlacedFurniture[]) {
   const maxId = itemsValue.reduce((maxValue, item) => {
     const match = item.id.match(/^furniture-(\d+)$/);
@@ -337,6 +345,20 @@ function getNextObstacleId(roomValue: Room) {
   return maxId + 1;
 }
 
+function getNextNoteId(notesValue: LayoutNote[]) {
+  const maxId = notesValue.reduce((maxValue, note) => {
+    const match = note.id.match(/^note-(\d+)$/);
+
+    if (!match) {
+      return maxValue;
+    }
+
+    return Math.max(maxValue, Number(match[1]));
+  }, 0);
+
+  return maxId + 1;
+}
+
 function normalizeLayoutForComparison(roomValue: Room, itemsValue: PlacedFurniture[]) {
   return JSON.stringify({
     room: roomValue,
@@ -349,6 +371,7 @@ export function useRoomLayout() {
   const initialCustomFurnitureCatalog = useMemo(() => loadCustomFurnitureCatalog(), []);
   const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>([]);
+  const [notes, setNotes] = useState<LayoutNote[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<PlacedFurniture | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
@@ -382,11 +405,15 @@ export function useRoomLayout() {
 
   const hasUnsavedChanges = useMemo(() => {
     if (!currentLayout) {
-      return items.length > 0;
+      return items.length > 0 || notes.length > 0;
     }
 
-    return JSON.stringify(items) !== JSON.stringify(currentLayout.items) || currentLayout.roomId !== currentRoomId;
-  }, [currentLayout, currentRoomId, items]);
+    return (
+      JSON.stringify(items) !== JSON.stringify(currentLayout.items) ||
+      JSON.stringify(notes) !== JSON.stringify(currentLayout.notes) ||
+      currentLayout.roomId !== currentRoomId
+    );
+  }, [currentLayout, currentRoomId, items, notes]);
 
   const hasUnsavedRoomChanges = useMemo(() => {
     if (!currentRoom) {
@@ -436,6 +463,7 @@ export function useRoomLayout() {
   const createLayoutSnapshot = (): LayoutHistorySnapshot => ({
     room,
     items,
+    notes,
     selectedId,
     currentRoomId,
     currentLayoutId,
@@ -444,8 +472,10 @@ export function useRoomLayout() {
   const restoreLayoutSnapshot = (snapshot: LayoutHistorySnapshot) => {
     nextFurnitureId = getNextFurnitureId(snapshot.items);
     nextObstacleId = getNextObstacleId(snapshot.room);
+    nextNoteId = getNextNoteId(snapshot.notes);
     setRoom(snapshot.room);
     setItems(snapshot.items);
+    setNotes(snapshot.notes);
     setSelectedId(snapshot.selectedId);
     setCurrentRoomId(snapshot.currentRoomId);
     setCurrentLayoutId(snapshot.currentLayoutId);
@@ -691,6 +721,7 @@ export function useRoomLayout() {
 
     setRoom(DEFAULT_ROOM);
     setItems([]);
+    setNotes([]);
     setSelectedId(null);
     setCurrentRoomId(null);
     setCurrentLayoutId(null);
@@ -710,6 +741,13 @@ export function useRoomLayout() {
 
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+    setNotes((currentNotes) =>
+      currentNotes.map((note) => ({
+        ...note,
+        x: clamp(note.x, 0, nextRoom.width),
+        y: clamp(note.y, 0, nextRoom.height),
+      })),
+    );
   };
 
   const applyRoomShapePreset = (preset: RoomShapePreset) => {
@@ -723,6 +761,13 @@ export function useRoomLayout() {
 
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+    setNotes((currentNotes) =>
+      currentNotes.map((note) => ({
+        ...note,
+        x: clamp(note.x, 0, nextRoom.width),
+        y: clamp(note.y, 0, nextRoom.height),
+      })),
+    );
   };
 
   const applyRoomJson = (nextRoom: Room) => {
@@ -730,6 +775,13 @@ export function useRoomLayout() {
     nextObstacleId = getNextObstacleId(nextRoom);
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+    setNotes((currentNotes) =>
+      currentNotes.map((note) => ({
+        ...note,
+        x: clamp(note.x, 0, nextRoom.width),
+        y: clamp(note.y, 0, nextRoom.height),
+      })),
+    );
   };
 
   const beginRoomShapeEdit = () => {
@@ -830,6 +882,45 @@ export function useRoomLayout() {
 
     setRoom(nextRoom);
     setItems((currentItems) => clampItemsToRoom(nextRoom, currentItems));
+  };
+
+  const addNote = (x: number, y: number) => {
+    recordHistory();
+    const nextNote: LayoutNote = {
+      id: createNoteId(),
+      text: '새 메모',
+      x: clamp(Math.round(x), 0, room.width),
+      y: clamp(Math.round(y), 0, room.height),
+    };
+
+    setNotes((currentNotes) => [...currentNotes, nextNote]);
+    return nextNote.id;
+  };
+
+  const updateNote = (id: string, update: Partial<Pick<LayoutNote, 'text' | 'x' | 'y'>>) => {
+    setNotes((currentNotes) =>
+      currentNotes.map((note) => {
+        if (note.id !== id) {
+          return note;
+        }
+
+        return {
+          ...note,
+          text: update.text ?? note.text,
+          x: update.x === undefined ? note.x : clamp(Math.round(update.x), 0, room.width),
+          y: update.y === undefined ? note.y : clamp(Math.round(update.y), 0, room.height),
+        };
+      }),
+    );
+  };
+
+  const beginNoteMove = () => {
+    recordHistory();
+  };
+
+  const deleteNote = (id: string) => {
+    recordHistory();
+    setNotes((currentNotes) => currentNotes.filter((note) => note.id !== id));
   };
 
   const deleteRoomObstacle = (id: string) => {
@@ -939,6 +1030,7 @@ export function useRoomLayout() {
     nextObstacleId = getNextObstacleId(savedRoom.room);
     setRoom(savedRoom.room);
     setItems([]);
+    setNotes([]);
     setSelectedId(null);
     setCurrentRoomId(savedRoom.id);
     setCurrentLayoutId(null);
@@ -976,7 +1068,8 @@ export function useRoomLayout() {
     }
 
     const nextLayout: SavedLayout = {
-      schemaVersion: 5,
+      schemaVersion: 6,
+      notes,
       id: createSavedLayoutId(),
       roomId,
       name: trimmedName,
@@ -1011,8 +1104,10 @@ export function useRoomLayout() {
 
     nextFurnitureId = getNextFurnitureId(layout.items);
     nextObstacleId = getNextObstacleId(layoutRoom.room);
+    nextNoteId = getNextNoteId(layout.notes);
     setRoom(layoutRoom.room);
     setItems(clampItemsToRoom(layoutRoom.room, layout.items));
+    setNotes(layout.notes);
     setSelectedId(null);
     setCurrentRoomId(layoutRoom.id);
     setCurrentLayoutId(layout.id);
@@ -1041,6 +1136,7 @@ export function useRoomLayout() {
           ...layout,
           roomId: currentRoomId ?? layout.roomId,
           items,
+          notes,
           updatedAt: new Date().toISOString(),
         };
       });
@@ -1072,6 +1168,7 @@ export function useRoomLayout() {
     catalog,
     customFurnitureCatalog,
     items,
+    notes,
     selectedId,
     selectedItem,
     currentLayout,
@@ -1106,6 +1203,10 @@ export function useRoomLayout() {
     addRoomPoint,
     deleteRoomPoint,
     addPillar,
+    addNote,
+    updateNote,
+    beginNoteMove,
+    deleteNote,
     deleteRoomObstacle,
     updateRoomObstacle,
     saveRoom,

@@ -692,9 +692,8 @@ export function InspectorPanel({
             <span>가로 너비 (mm)</span>
             <input
               type="number"
-              min="240"
-              max="1200"
-              step="10"
+              min="1"
+              step="1"
               value={roomDraft.width}
               onChange={(event) => setRoomDraft((currentDraft) => ({ ...currentDraft, width: event.target.value }))}
             />
@@ -703,9 +702,8 @@ export function InspectorPanel({
             <span>세로 깊이 (mm)</span>
             <input
               type="number"
-              min="180"
-              max="900"
-              step="10"
+              min="1"
+              step="1"
               value={roomDraft.height}
               onChange={(event) => setRoomDraft((currentDraft) => ({ ...currentDraft, height: event.target.value }))}
             />
@@ -715,7 +713,7 @@ export function InspectorPanel({
           적용
         </button>
       </form>
-      <p>240 × 180부터 1200 × 900까지 조정할 수 있습니다.</p>
+      <p>1mm 이상이면 원하는 크기로 조정할 수 있습니다.</p>
     </div>
   );
 

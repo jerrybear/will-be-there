@@ -5,6 +5,7 @@ export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
 export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
 export type FurnitureThreeModel = 'box' | 'desk_neomin' | 'desk_four_leg' | 'bed_frame' | 'sofa_cushion';
+export type CanvasTool = 'select' | 'walls' | 'dimensions' | 'memo';
 
 export interface Size {
   width: number;
@@ -75,6 +76,11 @@ export interface PlacedFurniture extends Size, Position {
   showDoorSwing?: boolean;
 }
 
+export interface LayoutNote extends Position {
+  id: string;
+  text: string;
+}
+
 export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {
   objectHeight?: number;
   elevation?: number;
@@ -97,6 +103,7 @@ export interface SavedLayout {
   name: string;
   memo: string;
   items: PlacedFurniture[];
+  notes: LayoutNote[];
   updatedAt: string;
 }
 

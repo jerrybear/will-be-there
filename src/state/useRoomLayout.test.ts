@@ -198,4 +198,26 @@ describe('useRoomLayout hook', () => {
 
     expect(result.current.catalog.some((item) => item.id === 'custom-furniture-seed')).toBe(true);
   });
+
+  it('should add notes and persist them with a saved layout', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    let noteId = '';
+
+    act(() => {
+      noteId = result.current.addNote(120, 140);
+      result.current.updateNote(noteId, { text: '침대 후보 위치' });
+    });
+
+    act(() => {
+      result.current.saveLayout('메모 포함 도면', '');
+    });
+
+    expect(result.current.notes).toHaveLength(1);
+    expect(result.current.notes[0].text).toBe('침대 후보 위치');
+
+    const storedLayouts = JSON.parse(storageState['virtual-room-layout:saved-layouts']);
+    expect(storedLayouts.layouts[0].notes).toHaveLength(1);
+    expect(storedLayouts.layouts[0].notes[0].text).toBe('침대 후보 위치');
+  });
 });

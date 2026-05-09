@@ -18,6 +18,7 @@ export default function App() {
     room,
     catalog,
     items,
+    notes,
     selectedId,
     selectedItem,
     currentLayout,
@@ -52,6 +53,10 @@ export default function App() {
     addRoomPoint,
     deleteRoomPoint,
     addPillar,
+    addNote,
+    updateNote,
+    beginNoteMove,
+    deleteNote,
     deleteRoomObstacle,
     updateRoomObstacle,
     saveRoom,
@@ -112,6 +117,7 @@ export default function App() {
           <RoomCanvas
             room={room}
             items={items}
+            notes={notes}
             selectedId={selectedId}
             isRoomEditingEnabled={isRoomEditingEnabled}
             isSelfIntersecting={isSelfIntersecting}
@@ -125,6 +131,10 @@ export default function App() {
             onRoomPointMove={moveRoomPoint}
             onRoomPointAdd={addRoomPoint}
             onRoomPointDelete={deleteRoomPoint}
+            onAddNote={addNote}
+            onNoteMoveStart={beginNoteMove}
+            onUpdateNote={updateNote}
+            onDeleteNote={deleteNote}
           />
         ) : (
           <Suspense fallback={<section className="panel preview-panel" />}>

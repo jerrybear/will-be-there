@@ -1,11 +1,11 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
+import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, LayoutNote, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
 import { createRectRoomShape, normalizeRoomShapePointIds } from '../utils/geometry';
 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
 const CUSTOM_FURNITURE_STORAGE_KEY = 'virtual-room-layout:custom-furniture-catalog';
-export const CURRENT_SCHEMA_VERSION = 5;
+export const CURRENT_SCHEMA_VERSION = 6;
 
 interface StoredLayoutsPayload {
   schemaVersion: number;
@@ -35,6 +35,7 @@ type LegacySavedLayout = {
   memo?: string;
   room?: Room;
   items: PlacedFurniture[];
+  notes?: LayoutNote[];
   updatedAt: string;
 };
 
@@ -224,6 +225,9 @@ function migrateSavedLayout(layout: LegacySavedLayout, fallbackRoomId: string): 
     name: layout.name,
     memo: layout.memo ?? '',
     items: layout.items.map(migratePlacedFurniture),
+    notes: Array.isArray(layout.notes)
+      ? layout.notes.filter((note): note is LayoutNote => !!note && typeof note.id === 'string' && typeof note.text === 'string' && typeof note.x === 'number' && typeof note.y === 'number')
+      : [],
     updatedAt: layout.updatedAt,
   };
 }
