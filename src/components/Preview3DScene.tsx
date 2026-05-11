@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { PlacedFurniture, Room } from '../types/layout';
-import { applyWallVisibility, createCeilingShadowBlocker, createRoomSceneObjects, getFrontWallSegmentId, toWorldLength } from '../utils/threeScene';
+import { applyWallVisibility, createCeilingShadowBlocker, createRoomSceneObjects, getFrontWallSegmentIds, toWorldLength } from '../utils/threeScene';
 
 interface Preview3DSceneProps {
   room: Room;
@@ -172,10 +172,10 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
       updateCamera();
       const cameraForward = new THREE.Vector3();
       camera.getWorldDirection(cameraForward);
-      const fadedSegmentId = isWallFadeEnabled
-        ? getFrontWallSegmentId(room, camera.position, cameraForward)
+      const fadedSegmentIds = isWallFadeEnabled
+        ? getFrontWallSegmentIds(room, camera.position, cameraForward)
         : null;
-      applyWallVisibility(wallObjects, fadedSegmentId);
+      applyWallVisibility(wallObjects, fadedSegmentIds);
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
     };

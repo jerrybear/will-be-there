@@ -6,6 +6,9 @@ import type { WallSegment } from './geometry';
 const UNIT_SCALE = 0.01;
 const WALL_THICKNESS = 6;
 const WALL_FADE_OPACITY = 0.28;
+const SECONDARY_WALL_DISTANCE_RATIO = 1.28;
+const SECONDARY_WALL_ALIGNMENT_DELTA = 0.18;
+const MAX_FADED_WALLS = 2;
 
 export function toWorldX(room: Room, x: number) {
   return (x - room.width / 2) * UNIT_SCALE;
@@ -376,15 +379,27 @@ function getInwardNormal(room: Room, segment: WallSegment) {
   return normalA.dot(toCenter) >= normalB.dot(toCenter) ? normalA.normalize() : normalB.normalize();
 }
 
-export function getFrontWallSegmentId(
+function getAdjacentWallSegmentIds(room: Room, segmentId: string) {
+  const segments = getRoomWallSegments(room);
+  const segmentIndex = segments.findIndex((segment) => segment.id === segmentId);
+
+  if (segmentIndex === -1) {
+    return new Set<string>();
+  }
+
+  const previous = segments[(segmentIndex - 1 + segments.length) % segments.length];
+  const next = segments[(segmentIndex + 1) % segments.length];
+
+  return new Set([previous.id, next.id]);
+}
+
+export function getFrontWallSegmentIds(
   room: Room,
   cameraPosition: THREE.Vector3,
   cameraForward: THREE.Vector3,
 ) {
   const normalizedForward = cameraForward.clone().normalize();
-  let bestSegmentId: string | null = null;
-  let bestProjectedDistance = Number.POSITIVE_INFINITY;
-  let bestAlignment = -1;
+  const candidates: Array<{ segmentId: string; projectedDistance: number; alignment: number }> = [];
 
   for (const segment of getRoomWallSegments(room)) {
     const center = getSegmentCenterWorld(room, segment);
@@ -408,24 +423,52 @@ export function getFrontWallSegmentId(
       continue;
     }
 
-    if (
-      projectedDistance < bestProjectedDistance - 0.0001 ||
-      (Math.abs(projectedDistance - bestProjectedDistance) <= 0.0001 && alignment > bestAlignment)
-    ) {
-      bestSegmentId = segment.id;
-      bestProjectedDistance = projectedDistance;
-      bestAlignment = alignment;
-    }
+    candidates.push({
+      segmentId: segment.id,
+      projectedDistance,
+      alignment,
+    });
   }
 
-  return bestSegmentId;
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  candidates.sort((left, right) => {
+    if (Math.abs(left.projectedDistance - right.projectedDistance) > 0.0001) {
+      return left.projectedDistance - right.projectedDistance;
+    }
+
+    return right.alignment - left.alignment;
+  });
+
+  const primary = candidates[0];
+  const adjacentSegmentIds = getAdjacentWallSegmentIds(room, primary.segmentId);
+
+  return candidates
+    .filter((candidate) => (
+      candidate.segmentId === primary.segmentId ||
+      (
+        adjacentSegmentIds.has(candidate.segmentId) &&
+        candidate.projectedDistance <= primary.projectedDistance * SECONDARY_WALL_DISTANCE_RATIO &&
+        candidate.alignment >= primary.alignment - SECONDARY_WALL_ALIGNMENT_DELTA
+      )
+    ))
+    .slice(0, MAX_FADED_WALLS)
+    .map((candidate) => candidate.segmentId);
 }
 
 export function applyWallVisibility(
   wallObjects: THREE.Object3D[],
-  fadedSegmentId: string | null,
+  fadedSegmentIds: string | string[] | null,
   fadeOpacity = WALL_FADE_OPACITY,
 ) {
+  const fadedSet = new Set(
+    typeof fadedSegmentIds === 'string'
+      ? [fadedSegmentIds]
+      : (fadedSegmentIds ?? []),
+  );
+
   wallObjects.forEach((wallObject) => {
     const material = wallObject.userData.wallMaterial as THREE.MeshStandardMaterial | undefined;
     const shadowMeshes = wallObject.userData.wallShadowMeshes as THREE.Mesh[] | undefined;
@@ -435,7 +478,7 @@ export function applyWallVisibility(
       return;
     }
 
-    const isFaded = wallObject.userData.wallSegmentId === fadedSegmentId;
+    const isFaded = fadedSet.has(wallObject.userData.wallSegmentId as string);
     material.transparent = isFaded;
     material.opacity = isFaded ? fadeOpacity : 1;
     material.depthWrite = !isFaded;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { createRectRoom } from './geometry';
-import { applyWallVisibility, createRoomSceneObjects, getFrontWallSegmentId } from './threeScene';
+import { applyWallVisibility, createRoomSceneObjects, getFrontWallSegmentIds } from './threeScene';
 import type { PlacedFurniture, Room } from '../types/layout';
 
 function getFurnitureGroup(item: PlacedFurniture) {
@@ -51,12 +51,33 @@ describe('threeScene detailed models', () => {
     expect(group.children.some((child) => child instanceof THREE.Mesh)).toBe(true);
   });
 
-  it('selects only the nearest front wall for auto fade', () => {
+  it('selects the nearest front wall for auto fade', () => {
     const room = createRectRoom(720, 480) as Room;
     const cameraPosition = new THREE.Vector3(0, 1, 5);
     const cameraForward = new THREE.Vector3(0, 0, -1);
 
-    expect(getFrontWallSegmentId(room, cameraPosition, cameraForward)).toBe('point-2-point-3');
+    expect(getFrontWallSegmentIds(room, cameraPosition, cameraForward)).toEqual(['point-2-point-3']);
+  });
+
+  it('allows two adjacent front walls to fade together near a corner', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const cameraPosition = new THREE.Vector3(6, 1, 6);
+    const cameraForward = new THREE.Vector3(-1, 0, -1).normalize();
+
+    const fadedWallIds = getFrontWallSegmentIds(room, cameraPosition, cameraForward);
+
+    expect(fadedWallIds).toHaveLength(2);
+    expect(fadedWallIds).toEqual(
+      expect.arrayContaining(['point-1-point-2', 'point-2-point-3']),
+    );
+  });
+
+  it('does not fade more than two walls even in corner-biased views', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const cameraPosition = new THREE.Vector3(6, 1, 6);
+    const cameraForward = new THREE.Vector3(-0.8, 0, -1).normalize();
+
+    expect(getFrontWallSegmentIds(room, cameraPosition, cameraForward)).toHaveLength(2);
   });
 
   it('applies fade opacity only to the chosen wall', () => {
