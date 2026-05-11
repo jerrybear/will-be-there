@@ -21,7 +21,7 @@ export function CanvasFurnitureItem({
   onPointerDown,
 }: CanvasFurnitureItemProps) {
   const footprint = getRotatedSize(item);
-  const isDoor = item.templateId === 'door';
+  const isDoor = item.kind === 'door';
   const normalizedRotation = ((item.rotation % 360) + 360) % 360;
   const usesCssRotation = item.isWallAttached && normalizedRotation !== 0;
   const renderWidth = item.isWallAttached ? item.width : footprint.width;

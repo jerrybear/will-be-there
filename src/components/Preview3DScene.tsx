@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { PlacedFurniture, Room } from '../types/layout';
-import { applyWallVisibility, createRoomSceneObjects, getFrontWallSegmentId, toWorldLength } from '../utils/threeScene';
+import { applyWallVisibility, createCeilingShadowBlocker, createRoomSceneObjects, getFrontWallSegmentId, toWorldLength } from '../utils/threeScene';
 
 interface Preview3DSceneProps {
   room: Room;
@@ -26,13 +26,36 @@ const lightPresets: Record<LightPreset, { label: string; azimuth: number; elevat
   overhead: { label: '상부', azimuth: 180, elevation: 78 },
 };
 
+function getRoomFramingSize(room: Room) {
+  return {
+    width: Math.max(toWorldLength(room.width), 4),
+    depth: Math.max(toWorldLength(room.height), 4),
+    height: Math.max(toWorldLength(room.wallHeight), 2.4),
+  };
+}
+
+function getFitDistance(room: Room, aspect: number, preset: CameraPreset) {
+  const framing = getRoomFramingSize(room);
+  const halfWidth = framing.width / 2;
+  const halfHeight = framing.height / 2;
+  const verticalFov = THREE.MathUtils.degToRad(45);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * aspect);
+  const distanceForHeight = halfHeight / Math.tan(verticalFov / 2);
+  const distanceForWidth = halfWidth / Math.tan(horizontalFov / 2);
+  const baseDistance = Math.max(distanceForHeight, distanceForWidth, framing.depth * 0.8);
+  const presetMultiplier = cameraPresets[preset].distance;
+
+  return baseDistance * presetMultiplier * 1.08;
+}
+
 function applyDirectionalLightPosition(
   light: THREE.DirectionalLight,
   room: Room,
   azimuth: number,
   elevation: number,
 ) {
-  const roomSpan = Math.max(toWorldLength(room.width), toWorldLength(room.height), 4);
+  const framing = getRoomFramingSize(room);
+  const roomSpan = Math.max(framing.width, framing.depth, framing.height, 4);
   const phi = (90 - elevation) * (Math.PI / 180);
   const theta = azimuth * (Math.PI / 180);
   const radius = roomSpan * 1.5;
@@ -44,6 +67,21 @@ function applyDirectionalLightPosition(
   );
 }
 
+function configureDirectionalLightShadow(light: THREE.DirectionalLight, room: Room) {
+  const framing = getRoomFramingSize(room);
+  const span = Math.max(framing.width, framing.depth, framing.height, 4);
+
+  light.shadow.camera.left = -span * 0.9;
+  light.shadow.camera.right = span * 0.9;
+  light.shadow.camera.top = span * 0.9;
+  light.shadow.camera.bottom = -span * 0.9;
+  light.shadow.camera.near = 0.5;
+  light.shadow.camera.far = span * 4.2;
+  light.shadow.bias = -0.0004;
+  light.shadow.normalBias = 0.03;
+  light.shadow.camera.updateProjectionMatrix();
+}
+
 export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
@@ -52,6 +90,7 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
   const [lightAzimuth, setLightAzimuth] = useState(135);
   const [lightElevation, setLightElevation] = useState(45);
   const [activeLightPreset, setActiveLightPreset] = useState<LightPreset | null>('soft');
+  const [isWallFadeEnabled, setIsWallFadeEnabled] = useState(true);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -69,10 +108,11 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
     renderer.shadowMap.type = THREE.PCFShadowMap;
     mount.appendChild(renderer.domElement);
 
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    const roomSpan = Math.max(toWorldLength(room.width), toWorldLength(room.height), 4);
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    const framing = getRoomFramingSize(room);
+    const roomSpan = Math.max(framing.width, framing.depth, framing.height, 4);
     camera.position.set(roomSpan * 0.62, roomSpan * 0.78, roomSpan * 0.9);
-    camera.lookAt(0, 0, 0);
+    camera.lookAt(0, framing.height * 0.38, 0);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.25);
     scene.add(ambientLight);
@@ -81,10 +121,12 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
     directionalLight.castShadow = true;
     directionalLight.shadow.mapSize.set(1024, 1024);
     applyDirectionalLightPosition(directionalLight, room, lightAzimuth, lightElevation);
+    configureDirectionalLightShadow(directionalLight, room);
     scene.add(directionalLight);
     directionalLightRef.current = directionalLight;
 
     const group = new THREE.Group();
+    group.add(createCeilingShadowBlocker(room));
     const sceneObjects = createRoomSceneObjects(room, items, selectedId);
     sceneObjects.forEach((object) => group.add(object));
     scene.add(group);
@@ -99,6 +141,7 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
 
       renderer.setSize(clientWidth, clientHeight);
       camera.aspect = clientWidth / clientHeight;
+      camera.far = Math.max(1000, roomSpan * 12);
       camera.updateProjectionMatrix();
     };
 
@@ -113,7 +156,7 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
     const initialCamera = cameraPresets[cameraPreset];
     let yaw = initialCamera.yaw;
     let pitch = initialCamera.pitch;
-    let distance = roomSpan * initialCamera.distance;
+    let distance = getFitDistance(room, 1, cameraPreset);
 
     const updateCamera = () => {
       const clampedPitch = Math.max(0.34, Math.min(1.18, pitch));
@@ -122,14 +165,16 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
         Math.sin(clampedPitch) * distance,
         Math.sin(yaw) * Math.cos(clampedPitch) * distance,
       );
-      camera.lookAt(0, 0, 0);
+      camera.lookAt(0, framing.height * 0.38, 0);
     };
 
     const render = () => {
       updateCamera();
       const cameraForward = new THREE.Vector3();
       camera.getWorldDirection(cameraForward);
-      const fadedSegmentId = getFrontWallSegmentId(room, camera.position, cameraForward);
+      const fadedSegmentId = isWallFadeEnabled
+        ? getFrontWallSegmentId(room, camera.position, cameraForward)
+        : null;
       applyWallVisibility(wallObjects, fadedSegmentId);
       renderer.render(scene, camera);
       animationFrame = window.requestAnimationFrame(render);
@@ -160,7 +205,9 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      distance = Math.max(roomSpan * 0.9, Math.min(roomSpan * 2.8, distance + event.deltaY * 0.01));
+      const minDistance = Math.max(framing.height * 0.75, roomSpan * 0.55);
+      const maxDistance = roomSpan * 5.2;
+      distance = Math.max(minDistance, Math.min(maxDistance, distance + event.deltaY * 0.02));
     };
 
     renderer.domElement.addEventListener('pointerdown', handlePointerDown);
@@ -187,13 +234,14 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
       mount.removeChild(renderer.domElement);
       directionalLightRef.current = null;
     };
-  }, [cameraPreset, items, room, selectedId]);
+  }, [cameraPreset, isWallFadeEnabled, items, room, selectedId]);
 
   useEffect(() => {
     if (directionalLightRef.current) {
       applyDirectionalLightPosition(directionalLightRef.current, room, lightAzimuth, lightElevation);
+      configureDirectionalLightShadow(directionalLightRef.current, room);
     }
-  }, [lightAzimuth, lightElevation, room.width, room.height]);
+  }, [lightAzimuth, lightElevation, room]);
 
   const applyLightPreset = (preset: LightPreset) => {
     const nextPreset = lightPresets[preset];
@@ -241,6 +289,26 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
                 {config.label}
               </button>
             ))}
+          </div>
+        </section>
+
+        <section className="scene-control-section">
+          <h3 className="light-controls-title">벽 보기</h3>
+          <div className="preset-button-grid preview-toggle-grid">
+            <button
+              type="button"
+              className={isWallFadeEnabled ? 'is-active' : ''}
+              onClick={() => setIsWallFadeEnabled(true)}
+            >
+              자동 투명
+            </button>
+            <button
+              type="button"
+              className={!isWallFadeEnabled ? 'is-active' : ''}
+              onClick={() => setIsWallFadeEnabled(false)}
+            >
+              불투명
+            </button>
           </div>
         </section>
 

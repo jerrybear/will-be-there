@@ -36,12 +36,12 @@ describe('FurniturePalette', () => {
     await user.click(screen.getByRole('button', { name: '직접 추가' }));
     await user.type(screen.getByPlaceholderText('예: 협탁'), '협탁');
     await user.selectOptions(screen.getByDisplayValue('의자/소파'), 'storage');
-    await user.clear(screen.getByDisplayValue('120'));
-    await user.type(screen.getByLabelText('가로'), '48');
-    await user.clear(screen.getByDisplayValue('80'));
-    await user.type(screen.getByLabelText('깊이'), '40');
-    await user.clear(screen.getByDisplayValue('70'));
-    await user.type(screen.getByLabelText('높이'), '52');
+    await user.clear(screen.getByDisplayValue('1200'));
+    await user.type(screen.getByLabelText('가로 (mm)'), '48');
+    await user.clear(screen.getByDisplayValue('800'));
+    await user.type(screen.getByLabelText('깊이 (mm)'), '40');
+    await user.clear(screen.getByDisplayValue('700'));
+    await user.type(screen.getByLabelText('높이 (mm)'), '52');
     await user.click(screen.getByRole('button', { name: '추가' }));
 
     expect(onAddCustomItem).toHaveBeenCalledWith({

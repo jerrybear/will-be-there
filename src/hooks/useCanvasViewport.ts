@@ -17,6 +17,7 @@ const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 5;
 const ZOOM_STEP = 0.2;
 const WHEEL_ZOOM_SENSITIVITY = 0.002;
+const FIT_PADDING_RATIO = 0.92;
 
 function clampZoom(value: number) {
   return Math.max(MIN_ZOOM, Math.min(value, MAX_ZOOM));
@@ -190,8 +191,20 @@ export function useCanvasViewport(contentWidth: number, contentHeight: number) {
     );
   };
 
+  const getFitZoom = (shell: HTMLElement) => {
+    if (contentWidth <= 0 || contentHeight <= 0) {
+      return 1;
+    }
+
+    const widthRatio = shell.clientWidth / contentWidth;
+    const heightRatio = shell.clientHeight / contentHeight;
+
+    return clampZoom(Math.min(widthRatio, heightRatio) * FIT_PADDING_RATIO);
+  };
+
   const resetViewport = () => {
-    const nextZoom = 1;
+    const shell = shellRef.current;
+    const nextZoom = shell ? getFitZoom(shell) : 1;
     setZoom(nextZoom);
     centerViewport(nextZoom);
   };

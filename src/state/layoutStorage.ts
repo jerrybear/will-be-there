@@ -1,11 +1,11 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
 import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, LayoutNote, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
-import { createRectRoomShape, normalizeRoomShapePointIds } from '../utils/geometry';
+import { createRectRoomShape, DEFAULT_WALL_HEIGHT, normalizeRoomShapePointIds } from '../utils/geometry';
 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
 const CUSTOM_FURNITURE_STORAGE_KEY = 'virtual-room-layout:custom-furniture-catalog';
-export const CURRENT_SCHEMA_VERSION = 6;
+export const CURRENT_SCHEMA_VERSION = 7;
 
 interface StoredLayoutsPayload {
   schemaVersion: number;
@@ -188,9 +188,14 @@ function migrateCustomFurnitureTemplate(item: CustomFurnitureTemplate): CustomFu
 }
 
 function migrateRoom(room: Room): Room {
+  const migratedWallHeight = typeof room.wallHeight === 'number' && Number.isFinite(room.wallHeight) && room.wallHeight > 0
+    ? (room.wallHeight <= 400 ? Math.round(room.wallHeight * 10) : Math.round(room.wallHeight))
+    : DEFAULT_WALL_HEIGHT;
+
   if (room.shape?.type === 'polygon' && Array.isArray(room.shape.points)) {
     return {
       ...room,
+      wallHeight: migratedWallHeight,
       shape: normalizeRoomShapePointIds({
         ...room.shape,
         obstacles: Array.isArray(room.shape.obstacles) ? room.shape.obstacles : [],
@@ -200,6 +205,7 @@ function migrateRoom(room: Room): Room {
 
   return {
     ...room,
+    wallHeight: migratedWallHeight,
     shape: normalizeRoomShapePointIds(createRectRoomShape(room.width, room.height)),
   };
 }

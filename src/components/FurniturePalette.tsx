@@ -26,9 +26,9 @@ const customItemCategories: FurnitureCategory[] = ['seating', 'tables', 'storage
 const defaultDraft = {
   label: '',
   category: 'seating' as FurnitureCategory,
-  width: '120',
-  height: '80',
-  objectHeight: '70',
+  width: '1200',
+  height: '800',
+  objectHeight: '700',
   color: '#94a3b8',
 };
 
@@ -118,8 +118,8 @@ export function FurniturePalette({ items, onAdd, onAddCustomItem }: FurniturePal
             </span>
             <span className="palette-size">
               <span>{format3DSize(item)}</span>
-              <span className="palette-size-label">가로 × 깊이 × 높이</span>
-              {!!item.elevation && <span className="palette-size-label">설치 높이 {item.elevation}</span>}
+              <span className="palette-size-label">가로 × 깊이 × 높이 (mm)</span>
+              {!!item.elevation && <span className="palette-size-label">설치 높이 {item.elevation}mm</span>}
             </span>
           </button>
         ))}
@@ -157,7 +157,7 @@ export function FurniturePalette({ items, onAdd, onAddCustomItem }: FurniturePal
             </label>
             <div className="custom-item-grid">
               <label>
-                <span>가로</span>
+                <span>가로 (mm)</span>
                 <input
                   type="number"
                   min="20"
@@ -167,7 +167,7 @@ export function FurniturePalette({ items, onAdd, onAddCustomItem }: FurniturePal
                 />
               </label>
               <label>
-                <span>깊이</span>
+                <span>깊이 (mm)</span>
                 <input
                   type="number"
                   min="20"
@@ -177,7 +177,7 @@ export function FurniturePalette({ items, onAdd, onAddCustomItem }: FurniturePal
                 />
               </label>
               <label>
-                <span>높이</span>
+                <span>높이 (mm)</span>
                 <input
                   type="number"
                   min="1"

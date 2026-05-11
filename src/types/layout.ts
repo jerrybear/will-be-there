@@ -5,7 +5,7 @@ export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
 export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
 export type FurnitureThreeModel = 'box' | 'desk_neomin' | 'desk_four_leg' | 'bed_frame' | 'sofa_cushion';
-export type CanvasTool = 'select' | 'walls' | 'dimensions' | 'memo';
+export type CanvasTool = 'select' | 'walls' | 'memo';
 
 export interface Size {
   width: number;
@@ -40,6 +40,7 @@ export type RoomObstacle =
     };
 
 export interface Room extends Size {
+  wallHeight: number;
   shape: RoomShape;
 }
 

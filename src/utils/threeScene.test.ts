@@ -69,8 +69,23 @@ describe('threeScene detailed models', () => {
     const solidWalls = wallObjects.filter((object) => object.userData.wallSegmentId !== 'point-2-point-3');
 
     expect((fadedWall?.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBeCloseTo(0.28);
+    expect(((fadedWall?.userData.wallShadowMeshes as THREE.Mesh[] | undefined) ?? [])[0]?.castShadow).toBe(false);
     solidWalls.forEach((wall) => {
       expect((wall.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBe(1);
+      expect(((wall.userData.wallShadowMeshes as THREE.Mesh[] | undefined) ?? [])[0]?.castShadow).toBe(true);
     });
+  });
+
+  it('uses room wallHeight for wall geometry', () => {
+    const room = {
+      ...createRectRoom(720, 480),
+      wallHeight: 320,
+    } as Room;
+    const wallObjects = createRoomSceneObjects(room, [], null).filter((object) => object.userData.wallSegmentId);
+    const firstWallMesh = wallObjects[0].children[0] as THREE.Mesh;
+    const geometry = firstWallMesh.geometry as THREE.ExtrudeGeometry;
+    geometry.computeBoundingBox();
+
+    expect(geometry.boundingBox?.max.y).toBeCloseTo(3.2, 3);
   });
 });

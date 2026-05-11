@@ -17,7 +17,7 @@ import {
 } from '../utils/geometry';
 import { loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureCatalog, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
 
-const DEFAULT_ROOM: Room = createRectRoom(720, 480);
+const DEFAULT_ROOM: Room = createRectRoom(7200, 4800);
 
 const MIN_ROOM_WIDTH = 1;
 const MIN_ROOM_HEIGHT = 1;
@@ -25,8 +25,8 @@ const MAX_ROOM_WIDTH = Number.MAX_SAFE_INTEGER;
 const MAX_ROOM_HEIGHT = Number.MAX_SAFE_INTEGER;
 const MIN_FURNITURE_SIZE = 20;
 const MIN_OBJECT_HEIGHT = 1;
-const MAX_OBJECT_HEIGHT = 400;
-const MAX_OBJECT_ELEVATION = 400;
+const MAX_OBJECT_HEIGHT = 4000;
+const MAX_OBJECT_ELEVATION = 4000;
 const MAX_HISTORY_LENGTH = 80;
 
 interface LayoutHistorySnapshot {
@@ -244,8 +244,17 @@ function applyFurnitureGeometry(
   };
 }
 
-function normalizeRoomSize(width: number, height: number): Room {
-  return createRectRoom(clamp(Math.round(width), MIN_ROOM_WIDTH, MAX_ROOM_WIDTH), clamp(Math.round(height), MIN_ROOM_HEIGHT, MAX_ROOM_HEIGHT));
+function normalizeWallHeight(value: number) {
+  return Math.max(MIN_OBJECT_HEIGHT, Math.round(value));
+}
+
+function normalizeRoomSize(width: number, height: number, wallHeight: number): Room {
+  const nextRoom = createRectRoom(
+    clamp(Math.round(width), MIN_ROOM_WIDTH, MAX_ROOM_WIDTH),
+    clamp(Math.round(height), MIN_ROOM_HEIGHT, MAX_ROOM_HEIGHT),
+  );
+  nextRoom.wallHeight = normalizeWallHeight(wallHeight);
+  return nextRoom;
 }
 
 function clampItemsToRoom(roomValue: Room, itemsValue: PlacedFurniture[]) {
@@ -256,7 +265,7 @@ function clampItemsToRoom(roomValue: Room, itemsValue: PlacedFurniture[]) {
 }
 
 function getSwingBounds(item: PlacedFurniture): { x: number, y: number, width: number, height: number } | null {
-  if (item.templateId !== 'door' || !item.showDoorSwing || !item.doorHinge || !item.doorSwingDir) return null;
+  if (item.kind !== 'door' || !item.showDoorSwing || !item.doorHinge || !item.doorSwingDir) return null;
   
   const footprint = getRotatedSize(item);
   const R = Math.max(item.width, item.height);
@@ -727,8 +736,8 @@ export function useRoomLayout() {
     setCurrentLayoutId(null);
   };
 
-  const resizeRoom = (width: number, height: number) => {
-    const resizedRoom = normalizeRoomSize(width, height);
+  const resizeRoom = (width: number, height: number, wallHeight: number = room.wallHeight) => {
+    const resizedRoom = normalizeRoomSize(width, height, wallHeight);
     const currentShape = getRoomShape(room);
     const nextRoom = {
       ...resizedRoom,
@@ -982,7 +991,7 @@ export function useRoomLayout() {
 
     const now = new Date().toISOString();
     const nextRoom: SavedRoom = {
-      schemaVersion: 5,
+      schemaVersion: 7,
       id: createSavedRoomId(),
       name: trimmedName,
       memo: memo.trim(),
@@ -1068,7 +1077,7 @@ export function useRoomLayout() {
     }
 
     const nextLayout: SavedLayout = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       notes,
       id: createSavedLayoutId(),
       roomId,

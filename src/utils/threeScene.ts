@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import type { PlacedFurniture, Position, Room, RoomObstacle } from '../types/layout';
-import { getItemPlacementRect, getRoomShape, getRoomWallSegments, getSegmentAngle, getNearestWallProjection, projectItemToWallLocal } from './geometry';
+import { DEFAULT_WALL_HEIGHT, getItemPlacementRect, getRoomShape, getRoomWallSegments, getSegmentAngle, getNearestWallProjection, projectItemToWallLocal } from './geometry';
 import type { WallSegment } from './geometry';
 
 const UNIT_SCALE = 0.01;
-const WALL_HEIGHT = 240;
 const WALL_THICKNESS = 6;
 const WALL_FADE_OPACITY = 0.28;
 
@@ -45,6 +44,27 @@ export function createFloorMesh(room: Room) {
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.receiveShadow = true;
+
+  return mesh;
+}
+
+export function createCeilingShadowBlocker(room: Room) {
+  const shape = new THREE.Shape(getRoomShape(room).points.map((point) => toShapePoint(room, point)));
+  const geometry = new THREE.ShapeGeometry(shape);
+  geometry.rotateX(Math.PI / 2);
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+  });
+  material.colorWrite = false;
+  material.depthWrite = false;
+  material.depthTest = false;
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.y = toWorldLength(room.wallHeight ?? DEFAULT_WALL_HEIGHT);
+  mesh.castShadow = true;
+  mesh.receiveShadow = false;
 
   return mesh;
 }
@@ -246,7 +266,7 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
   const segments = getRoomWallSegments(room);
   const openingsMap = getOpeningsByWall(room, items, segments);
   const wallThickness = toWorldLength(WALL_THICKNESS);
-  const wallHeight = toWorldLength(WALL_HEIGHT);
+  const wallHeight = toWorldLength(room.wallHeight ?? DEFAULT_WALL_HEIGHT);
   const meshes: THREE.Object3D[] = [];
 
   for (const segment of segments) {
@@ -285,6 +305,7 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
     group.add(wallMesh);
     group.userData.wallSegmentId = segment.id;
     group.userData.wallMaterial = material;
+    group.userData.wallShadowMeshes = [wallMesh];
 
     // Center the extruded shape
     wallMesh.position.set(-segmentLength / 2, 0, -wallThickness / 2);
@@ -393,6 +414,7 @@ export function applyWallVisibility(
 ) {
   wallObjects.forEach((wallObject) => {
     const material = wallObject.userData.wallMaterial as THREE.MeshStandardMaterial | undefined;
+    const shadowMeshes = wallObject.userData.wallShadowMeshes as THREE.Mesh[] | undefined;
 
     if (!material) {
       return;
@@ -403,6 +425,10 @@ export function applyWallVisibility(
     material.opacity = isFaded ? fadeOpacity : 1;
     material.depthWrite = !isFaded;
     material.needsUpdate = true;
+
+    shadowMeshes?.forEach((mesh) => {
+      mesh.castShadow = !isFaded;
+    });
   });
 }
 
@@ -411,7 +437,7 @@ function createObstacleMesh(room: Room, obstacle: RoomObstacle) {
     return null;
   }
 
-  const height = toWorldLength(WALL_HEIGHT);
+  const height = toWorldLength(room.wallHeight ?? DEFAULT_WALL_HEIGHT);
   const geometry = new THREE.BoxGeometry(toWorldLength(obstacle.width), height, toWorldLength(obstacle.height));
   const material = new THREE.MeshStandardMaterial({
     color: 0x94a3b8,

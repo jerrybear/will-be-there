@@ -7,7 +7,7 @@ import type { SavedLayout } from '../types/layout';
 import type { SavedRoom } from '../types/layout';
 import type { SnapSize } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
-import { getRoomShape } from '../utils/geometry';
+import { DEFAULT_WALL_HEIGHT, getRoomShape } from '../utils/geometry';
 
 interface InspectorPanelProps {
   room: Room;
@@ -26,7 +26,7 @@ interface InspectorPanelProps {
   onRoomEditingChange: (enabled: boolean) => void;
   onUpdateFurniture: (id: string, update: FurnitureGeometryUpdate) => void;
   onSnapSizeChange: (snapSize: SnapSize) => void;
-  onResizeRoom: (width: number, height: number) => void;
+  onResizeRoom: (width: number, height: number, wallHeight: number) => void;
   onApplyRoomShapePreset: (preset: RoomShapePreset) => void;
   onApplyRoomJson: (room: Room) => void;
   onAddPillar: () => void;
@@ -99,6 +99,7 @@ function formatRoomJson(room: Room) {
     {
       width: room.width,
       height: room.height,
+      wallHeight: room.wallHeight,
       points: shape.points.map((point) => ({
         id: point.id,
         x: point.x,
@@ -228,9 +229,10 @@ function parseRoomJson(value: string): Room {
 
   const width = parseNumber(parsedValue.width, 'width');
   const height = parseNumber(parsedValue.height, 'height');
+  const wallHeight = 'wallHeight' in parsedValue ? parseNumber(parsedValue.wallHeight, 'wallHeight') : DEFAULT_WALL_HEIGHT;
 
-  if (width <= 0 || height <= 0) {
-    throw new Error('width와 height는 0보다 커야 합니다.');
+  if (width <= 0 || height <= 0 || wallHeight <= 0) {
+    throw new Error('width, height, wallHeight는 0보다 커야 합니다.');
   }
 
   if (!Array.isArray(parsedValue.points) || parsedValue.points.length < 3) {
@@ -308,6 +310,7 @@ function parseRoomJson(value: string): Room {
   return {
     width,
     height,
+    wallHeight,
     shape: {
       type: 'polygon',
       points,
@@ -361,6 +364,7 @@ export function InspectorPanel({
   const [roomDraft, setRoomDraft] = useState({
     width: String(room.width),
     height: String(room.height),
+    wallHeight: String(room.wallHeight),
   });
   const [furnitureDraft, setFurnitureDraft] = useState({
     x: '',
@@ -377,6 +381,7 @@ export function InspectorPanel({
     setRoomDraft({
       width: String(room.width),
       height: String(room.height),
+      wallHeight: String(room.wallHeight),
     });
     setRoomJsonDraft(formatRoomJson(room));
     setRoomJsonError('');
@@ -428,8 +433,9 @@ export function InspectorPanel({
 
   const draftWidth = Number(roomDraft.width);
   const draftHeight = Number(roomDraft.height);
-  const hasValidRoomDraft = Number.isFinite(draftWidth) && Number.isFinite(draftHeight) && draftWidth > 0 && draftHeight > 0;
-  const hasRoomChanges = draftWidth !== room.width || draftHeight !== room.height;
+  const draftWallHeight = Number(roomDraft.wallHeight);
+  const hasValidRoomDraft = Number.isFinite(draftWidth) && Number.isFinite(draftHeight) && Number.isFinite(draftWallHeight) && draftWidth > 0 && draftHeight > 0 && draftWallHeight > 0;
+  const hasRoomChanges = draftWidth !== room.width || draftHeight !== room.height || draftWallHeight !== room.wallHeight;
   const hasValidFurnitureDraft = hasValidNumberDraft([
     furnitureDraft.x,
     furnitureDraft.y,
@@ -455,7 +461,7 @@ export function InspectorPanel({
       return;
     }
 
-    onResizeRoom(draftWidth, draftHeight);
+    onResizeRoom(draftWidth, draftHeight, draftWallHeight);
   };
 
   const handleFurnitureApply = (event: FormEvent<HTMLFormElement>) => {
@@ -708,6 +714,16 @@ export function InspectorPanel({
               onChange={(event) => setRoomDraft((currentDraft) => ({ ...currentDraft, height: event.target.value }))}
             />
           </label>
+          <label>
+            <span>벽/천장 높이 (mm)</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={roomDraft.wallHeight}
+              onChange={(event) => setRoomDraft((currentDraft) => ({ ...currentDraft, wallHeight: event.target.value }))}
+            />
+          </label>
         </div>
         <button type="submit" className="primary-button compact-button" disabled={!hasValidRoomDraft || !hasRoomChanges}>
           적용
@@ -920,22 +936,22 @@ export function InspectorPanel({
           />
         </label>
         <label>
-          <span>높이</span>
+          <span>높이 (mm)</span>
           <input
             type="number"
             min="1"
-            max="400"
+            max="4000"
             step="1"
             value={furnitureDraft.objectHeight}
             onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, objectHeight: event.target.value }))}
           />
         </label>
         <label>
-          <span>설치 높이</span>
+          <span>설치 높이 (mm)</span>
           <input
             type="number"
             min="0"
-            max="400"
+            max="4000"
             step="1"
             value={furnitureDraft.elevation}
             onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, elevation: event.target.value }))}
@@ -1034,7 +1050,7 @@ export function InspectorPanel({
         90도 회전
       </button>
       
-      {item.templateId === 'door' && (
+      {item.kind === 'door' && (
         <div className="door-options-panel">
           <label className="toggle-label">
             <input

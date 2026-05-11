@@ -45,7 +45,31 @@ interface NoteDragState {
   pointerOffsetY: number;
 }
 
-function getPolygonCentroid(points: { x: number; y: number }[]) {
+interface Point2D {
+  x: number;
+  y: number;
+}
+
+const CORNER_SNAP_ANGLES = [30, 45, 90, 180] as const;
+const ANGLE_SNAP_THRESHOLD_DEGREES = 4;
+
+function DimensionsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5 7H19V17H5V7ZM7 9V15H17V9H7ZM9 11H15V13H9V11ZM4 5V7H2V5H4ZM22 5V7H20V5H22ZM4 17V19H2V17H4ZM22 17V19H20V17H22Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function LayersIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3L2 8L12 13L22 8L12 3ZM5.6 11L12 14.2L18.4 11L22 12.8L12 18L2 12.8L5.6 11ZM5.6 15L12 18.2L18.4 15L22 16.8L12 22L2 16.8L5.6 15Z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function getPolygonCentroid(points: Point2D[]) {
   const total = points.reduce(
     (accumulator, point) => ({
       x: accumulator.x + point.x,
@@ -60,7 +84,7 @@ function getPolygonCentroid(points: { x: number; y: number }[]) {
   };
 }
 
-function getCornerAngleDegrees(previousPoint: { x: number; y: number }, currentPoint: { x: number; y: number }, nextPoint: { x: number; y: number }) {
+function getCornerAngleDegrees(previousPoint: Point2D, currentPoint: Point2D, nextPoint: Point2D) {
   const vectorA = {
     x: previousPoint.x - currentPoint.x,
     y: previousPoint.y - currentPoint.y,
@@ -79,7 +103,202 @@ function getCornerAngleDegrees(previousPoint: { x: number; y: number }, currentP
   const cosine = (vectorA.x * vectorB.x + vectorA.y * vectorB.y) / (lengthA * lengthB);
   const normalizedCosine = Math.max(-1, Math.min(1, cosine));
 
-  return Math.round(Math.acos(normalizedCosine) * 180 / Math.PI);
+  return Math.acos(normalizedCosine) * 180 / Math.PI;
+}
+
+function roundAngleForDisplay(angle: number) {
+  return Math.round(angle * 100) / 100;
+}
+
+function getDistanceSquared(a: Point2D, b: Point2D) {
+  return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
+}
+
+function rotateVector(vector: Point2D, degrees: number) {
+  const radians = degrees * Math.PI / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+
+  return {
+    x: vector.x * cos - vector.y * sin,
+    y: vector.x * sin + vector.y * cos,
+  };
+}
+
+function normalizeVector(vector: Point2D) {
+  const length = Math.hypot(vector.x, vector.y);
+
+  if (length < 0.001) {
+    return null;
+  }
+
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+  };
+}
+
+function projectPointToRay(point: Point2D, origin: Point2D, direction: Point2D) {
+  const normalizedDirection = normalizeVector(direction);
+
+  if (!normalizedDirection) {
+    return null;
+  }
+
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const projectionLength = Math.max(0, dx * normalizedDirection.x + dy * normalizedDirection.y);
+
+  return {
+    x: origin.x + normalizedDirection.x * projectionLength,
+    y: origin.y + normalizedDirection.y * projectionLength,
+  };
+}
+
+interface AngleRayCandidate {
+  angle: number;
+  origin: Point2D;
+  direction: Point2D;
+  projectedPoint: Point2D;
+}
+
+function getRayIntersection(first: AngleRayCandidate, second: AngleRayCandidate) {
+  const firstDirection = normalizeVector(first.direction);
+  const secondDirection = normalizeVector(second.direction);
+
+  if (!firstDirection || !secondDirection) {
+    return null;
+  }
+
+  const denominator = firstDirection.x * secondDirection.y - firstDirection.y * secondDirection.x;
+
+  if (Math.abs(denominator) < 0.001) {
+    return null;
+  }
+
+  const deltaX = second.origin.x - first.origin.x;
+  const deltaY = second.origin.y - first.origin.y;
+  const t = (deltaX * secondDirection.y - deltaY * secondDirection.x) / denominator;
+  const u = (deltaX * firstDirection.y - deltaY * firstDirection.x) / denominator;
+
+  if (t < 0 || u < 0) {
+    return null;
+  }
+
+  return {
+    x: first.origin.x + firstDirection.x * t,
+    y: first.origin.y + firstDirection.y * t,
+  };
+}
+
+function getAngleRayCandidates(
+  targetPoint: Point2D,
+  anchorPoint: Point2D,
+  fixedNeighbor: Point2D,
+) {
+  const fixedVector = {
+    x: fixedNeighbor.x - anchorPoint.x,
+    y: fixedNeighbor.y - anchorPoint.y,
+  };
+  const currentAngle = getCornerAngleDegrees(fixedNeighbor, anchorPoint, targetPoint);
+
+  if (currentAngle === null) {
+    return [];
+  }
+
+  const candidates: AngleRayCandidate[] = [];
+
+  CORNER_SNAP_ANGLES.forEach((targetAngle) => {
+    if (Math.abs(currentAngle - targetAngle) > ANGLE_SNAP_THRESHOLD_DEGREES) {
+      return;
+    }
+
+    [targetAngle, -targetAngle].forEach((signedAngle) => {
+      const direction = rotateVector(fixedVector, signedAngle);
+      const candidate = projectPointToRay(targetPoint, anchorPoint, direction);
+
+      if (!candidate) {
+        return;
+      }
+
+      const snappedAngle = getCornerAngleDegrees(fixedNeighbor, anchorPoint, candidate);
+
+      if (snappedAngle === null || Math.abs(snappedAngle - targetAngle) > 0.25) {
+        return;
+      }
+
+      candidates.push({
+        angle: targetAngle,
+        origin: anchorPoint,
+        direction,
+        projectedPoint: candidate,
+      });
+    });
+  });
+
+  return candidates;
+}
+
+function getSnappedPointFromAdjacentAngles(
+  targetPoint: Point2D,
+  previousPreviousPoint: Point2D,
+  previousPoint: Point2D,
+  nextPoint: Point2D,
+  nextNextPoint: Point2D,
+) {
+  const previousCornerCandidates = getAngleRayCandidates(targetPoint, previousPoint, previousPreviousPoint);
+  const nextCornerCandidates = getAngleRayCandidates(targetPoint, nextPoint, nextNextPoint);
+
+  let bestIntersection: Point2D | null = null;
+  let bestIntersectionDistanceSquared = Number.POSITIVE_INFINITY;
+
+  previousCornerCandidates.forEach((previousCandidate) => {
+    nextCornerCandidates.forEach((nextCandidate) => {
+      const intersection = getRayIntersection(previousCandidate, nextCandidate);
+
+      if (!intersection) {
+        return;
+      }
+
+      const previousAngle = getCornerAngleDegrees(previousPreviousPoint, previousPoint, intersection);
+      const nextAngle = getCornerAngleDegrees(intersection, nextPoint, nextNextPoint);
+
+      if (
+        previousAngle === null ||
+        nextAngle === null ||
+        Math.abs(previousAngle - previousCandidate.angle) > 0.25 ||
+        Math.abs(nextAngle - nextCandidate.angle) > 0.25
+      ) {
+        return;
+      }
+
+      const intersectionDistanceSquared = getDistanceSquared(targetPoint, intersection);
+
+      if (intersectionDistanceSquared < bestIntersectionDistanceSquared) {
+        bestIntersection = intersection;
+        bestIntersectionDistanceSquared = intersectionDistanceSquared;
+      }
+    });
+  });
+
+  if (bestIntersection) {
+    return bestIntersection;
+  }
+
+  const previousCornerCandidate = previousCornerCandidates
+    .map((candidate) => candidate.projectedPoint)
+    .sort((left, right) => getDistanceSquared(targetPoint, left) - getDistanceSquared(targetPoint, right))[0] ?? null;
+  const nextCornerCandidate = nextCornerCandidates
+    .map((candidate) => candidate.projectedPoint)
+    .sort((left, right) => getDistanceSquared(targetPoint, left) - getDistanceSquared(targetPoint, right))[0] ?? null;
+
+  if (previousCornerCandidate && nextCornerCandidate) {
+    return getDistanceSquared(targetPoint, previousCornerCandidate) <= getDistanceSquared(targetPoint, nextCornerCandidate)
+      ? previousCornerCandidate
+      : nextCornerCandidate;
+  }
+
+  return previousCornerCandidate ?? nextCornerCandidate ?? targetPoint;
 }
 
 export function RoomCanvas({
@@ -109,6 +328,7 @@ export function RoomCanvas({
   const [pointDragState, setPointDragState] = useState<PointDragState | null>(null);
   const [noteDragState, setNoteDragState] = useState<NoteDragState | null>(null);
   const [activeTool, setActiveTool] = useState<CanvasTool>('select');
+  const [showDimensions, setShowDimensions] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [isLayerPanelOpen, setIsLayerPanelOpen] = useState(false);
   const [layerVisibility, setLayerVisibility] = useState({
@@ -140,7 +360,7 @@ export function RoomCanvas({
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const focusX = selectedItem ? selectedItem.x : room.width / 2;
   const focusY = selectedItem ? selectedItem.y : room.height / 2;
-  const shouldShowRoomDimensions = activeTool === 'dimensions' || isRoomEditingEnabled;
+  const shouldShowRoomDimensions = showDimensions || isRoomEditingEnabled;
   const activeCornerAngles = pointDragState
     ? (() => {
         const currentIndex = pointDragState.index;
@@ -173,7 +393,7 @@ export function RoomCanvas({
 
           return [{
             id: `corner-angle-${pointIndex}`,
-            angle,
+            angle: roundAngleForDisplay(angle),
             x: point.x + unitVector.x * labelOffset,
             y: point.y + unitVector.y * labelOffset,
           }];
@@ -254,8 +474,25 @@ export function RoomCanvas({
       }
 
       const roomRect = roomElement.getBoundingClientRect();
-      const nextX = (event.clientX - roomRect.left) / displayZoom;
-      const nextY = (event.clientY - roomRect.top) / displayZoom;
+      let nextX = (event.clientX - roomRect.left) / displayZoom;
+      let nextY = (event.clientY - roomRect.top) / displayZoom;
+
+      if (event.shiftKey) {
+        const previousPreviousIndex = (pointDragState.index - 2 + roomOutline.length) % roomOutline.length;
+        const previousIndex = (pointDragState.index - 1 + roomOutline.length) % roomOutline.length;
+        const nextIndex = (pointDragState.index + 1) % roomOutline.length;
+        const nextNextIndex = (pointDragState.index + 2) % roomOutline.length;
+        const snappedPoint = getSnappedPointFromAdjacentAngles(
+          { x: nextX, y: nextY },
+          roomOutline[previousPreviousIndex],
+          roomOutline[previousIndex],
+          roomOutline[nextIndex],
+          roomOutline[nextNextIndex],
+        );
+
+        nextX = snappedPoint.x;
+        nextY = snappedPoint.y;
+      }
 
       onRoomPointMove(pointDragState.index, nextX, nextY);
     };
@@ -271,7 +508,7 @@ export function RoomCanvas({
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [displayZoom, onRoomPointMove, pointDragState]);
+  }, [displayZoom, onRoomPointMove, pointDragState, roomOutline]);
 
   useEffect(() => {
     if (!noteDragState) {
@@ -464,43 +701,61 @@ export function RoomCanvas({
         <button type="button" className={activeTool === 'walls' ? 'is-active' : ''} onClick={() => handleToolChange('walls')}>
           벽 편집
         </button>
-        <button type="button" className={activeTool === 'dimensions' ? 'is-active' : ''} onClick={() => handleToolChange('dimensions')}>
-          치수
-        </button>
         <button type="button" className={activeTool === 'memo' ? 'is-active' : ''} onClick={() => handleToolChange('memo')}>
           메모
         </button>
-        <button type="button" className={isLayerPanelOpen ? 'is-active' : ''} onClick={() => setIsLayerPanelOpen((current) => !current)}>
-          레이어
+      </div>
+      <div className="canvas-view-controls">
+        <button
+          type="button"
+          className={`canvas-view-control ${showDimensions ? 'is-active' : ''}`}
+          onClick={() => setShowDimensions((current) => !current)}
+          aria-pressed={showDimensions}
+          title="치수 표시"
+        >
+          <DimensionsIcon />
+          <span>치수</span>
         </button>
-        {isLayerPanelOpen && (
-          <div className="canvas-layer-panel">
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={layerVisibility.showGrid}
-                onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showGrid: event.target.checked }))}
-              />
-              <span>그리드</span>
-            </label>
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={layerVisibility.showFurniture}
-                onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showFurniture: event.target.checked }))}
-              />
-              <span>가구</span>
-            </label>
-            <label className="toggle-label">
-              <input
-                type="checkbox"
-                checked={layerVisibility.showNotes}
-                onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showNotes: event.target.checked }))}
-              />
-              <span>메모</span>
-            </label>
-          </div>
-        )}
+        <div className="canvas-layer-control">
+          <button
+            type="button"
+            className={`canvas-view-control ${isLayerPanelOpen ? 'is-active' : ''}`}
+            onClick={() => setIsLayerPanelOpen((current) => !current)}
+            aria-pressed={isLayerPanelOpen}
+            title="레이어"
+          >
+            <LayersIcon />
+            <span>레이어</span>
+          </button>
+          {isLayerPanelOpen && (
+            <div className="canvas-layer-panel">
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.showGrid}
+                  onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showGrid: event.target.checked }))}
+                />
+                <span>그리드</span>
+              </label>
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.showFurniture}
+                  onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showFurniture: event.target.checked }))}
+                />
+                <span>가구</span>
+              </label>
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={layerVisibility.showNotes}
+                  onChange={(event) => setLayerVisibility((currentState) => ({ ...currentState, showNotes: event.target.checked }))}
+                />
+                <span>메모</span>
+              </label>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="room-shell-wrapper">
@@ -589,7 +844,7 @@ export function RoomCanvas({
                 item={item}
                 isSelected={selectedId === item.id}
                 isOverlapping={overlappingItemIds.has(item.id)}
-                showDimensions={activeTool === 'dimensions'}
+                showDimensions={showDimensions}
                 zoom={displayZoom}
                 onPointerDown={handleItemPointerDown}
               />
@@ -659,7 +914,7 @@ export function RoomCanvas({
       )}
       <div className="zoom-controls">
         <button type="button" onClick={zoomOut}>-</button>
-        <span>{Math.round(displayZoom * 100)}%</span>
+        <span>{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={zoomIn}>+</button>
         <button type="button" onClick={resetViewport}>맞춤</button>
       </div>

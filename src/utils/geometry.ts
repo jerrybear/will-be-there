@@ -2,6 +2,7 @@ import type { PlacedFurniture, Position, Room, RoomObstacle, RoomShape, RoomShap
 import { getRotatedSize } from '../types/layout';
 
 export interface Rect extends Size, Position {}
+export const DEFAULT_WALL_HEIGHT = 2400;
 
 export interface WallSegment {
   id: string;
@@ -83,6 +84,7 @@ export function createRectRoom(width: number, height: number): Room {
   return {
     width,
     height,
+    wallHeight: DEFAULT_WALL_HEIGHT,
     shape: createRectRoomShape(width, height),
   };
 }

@@ -25,8 +25,9 @@ describe('useRoomLayout hook', () => {
   it('should initialize with default room and no items', () => {
     const { result } = renderHook(() => useRoomLayout());
     
-    expect(result.current.room.width).toBe(720);
-    expect(result.current.room.height).toBe(480);
+    expect(result.current.room.width).toBe(7200);
+    expect(result.current.room.height).toBe(4800);
+    expect(result.current.room.wallHeight).toBe(2400);
     expect(result.current.items).toHaveLength(0);
   });
 
@@ -74,8 +75,8 @@ describe('useRoomLayout hook', () => {
       result.current.moveFurniture(itemId, 2000, 2000);
     });
     
-    expect(result.current.items[0].x).toBeLessThan(720);
-    expect(result.current.items[0].y).toBeLessThan(480);
+    expect(result.current.items[0].x).toBeLessThan(7200);
+    expect(result.current.items[0].y).toBeLessThan(4800);
   });
 
   it('should handle undo and redo', () => {
@@ -101,11 +102,12 @@ describe('useRoomLayout hook', () => {
     const { result } = renderHook(() => useRoomLayout());
     
     act(() => {
-      result.current.resizeRoom(800, 600);
+      result.current.resizeRoom(8000, 6000, 2700);
     });
     
-    expect(result.current.room.width).toBe(800);
-    expect(result.current.room.height).toBe(600);
+    expect(result.current.room.width).toBe(8000);
+    expect(result.current.room.height).toBe(6000);
+    expect(result.current.room.wallHeight).toBe(2700);
   });
 
   it('should delete furniture', () => {
