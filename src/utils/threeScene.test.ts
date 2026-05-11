@@ -70,9 +70,11 @@ describe('threeScene detailed models', () => {
 
     expect((fadedWall?.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBeCloseTo(0.28);
     expect(((fadedWall?.userData.wallShadowMeshes as THREE.Mesh[] | undefined) ?? [])[0]?.castShadow).toBe(false);
+    expect((fadedWall?.userData.wallShadowBlocker as THREE.Mesh | undefined)?.castShadow).toBe(true);
     solidWalls.forEach((wall) => {
       expect((wall.userData.wallMaterial as THREE.MeshStandardMaterial).opacity).toBe(1);
       expect(((wall.userData.wallShadowMeshes as THREE.Mesh[] | undefined) ?? [])[0]?.castShadow).toBe(true);
+      expect((wall.userData.wallShadowBlocker as THREE.Mesh | undefined)?.castShadow).toBe(false);
     });
   });
 

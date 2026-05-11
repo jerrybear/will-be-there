@@ -293,6 +293,17 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
     wallMesh.castShadow = true;
     wallMesh.receiveShadow = true;
 
+    const shadowBlockerMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      side: THREE.DoubleSide,
+    });
+    shadowBlockerMaterial.colorWrite = false;
+    shadowBlockerMaterial.depthWrite = false;
+    shadowBlockerMaterial.depthTest = false;
+    const shadowBlocker = new THREE.Mesh(geometry, shadowBlockerMaterial);
+    shadowBlocker.castShadow = false;
+    shadowBlocker.receiveShadow = false;
+
     // The shape was built in local 2D (X=along wall, Y=up).
     // ExtrudeGeometry extrudes along Z.
     // We need to:
@@ -303,12 +314,15 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
 
     const group = new THREE.Group();
     group.add(wallMesh);
+    group.add(shadowBlocker);
     group.userData.wallSegmentId = segment.id;
     group.userData.wallMaterial = material;
     group.userData.wallShadowMeshes = [wallMesh];
+    group.userData.wallShadowBlocker = shadowBlocker;
 
     // Center the extruded shape
     wallMesh.position.set(-segmentLength / 2, 0, -wallThickness / 2);
+    shadowBlocker.position.copy(wallMesh.position);
 
     // Add glass panels for window openings
     for (const opening of openings) {
@@ -415,6 +429,7 @@ export function applyWallVisibility(
   wallObjects.forEach((wallObject) => {
     const material = wallObject.userData.wallMaterial as THREE.MeshStandardMaterial | undefined;
     const shadowMeshes = wallObject.userData.wallShadowMeshes as THREE.Mesh[] | undefined;
+    const shadowBlocker = wallObject.userData.wallShadowBlocker as THREE.Mesh | undefined;
 
     if (!material) {
       return;
@@ -429,6 +444,9 @@ export function applyWallVisibility(
     shadowMeshes?.forEach((mesh) => {
       mesh.castShadow = !isFaded;
     });
+    if (shadowBlocker) {
+      shadowBlocker.castShadow = isFaded;
+    }
   });
 }
 
