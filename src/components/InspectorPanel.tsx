@@ -20,7 +20,7 @@ interface InspectorPanelProps {
   currentRoom: SavedRoom | null;
   onRotate: (id: string) => void;
   onRename: (id: string, label: string) => void;
-  onUpdateDoorSwing: (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => void;
+  onUpdateDoorSwing: (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing' | 'doorOpenAngle'>>) => void;
   onDuplicate: (id: string) => void;
   onDeleteFurniture: (id: string) => void;
   onRoomEditingChange: (enabled: boolean) => void;
@@ -1061,53 +1061,66 @@ export function InspectorPanel({
                   showDoorSwing: e.target.checked,
                   doorHinge: item.doorHinge || 'left',
                   doorSwingDir: item.doorSwingDir || 'front',
+                  doorOpenAngle: item.doorOpenAngle ?? 90,
                 });
               }}
             />
             <span>스윙 영역 표시</span>
           </label>
-          {item.showDoorSwing && (
-            <div className="door-swing-controls">
-              <div className="control-group">
-                <span>경첩</span>
-                <div className="segment-control">
-                  <button
-                    type="button"
-                    className={item.doorHinge === 'left' ? 'active' : ''}
-                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
-                  >
-                    왼쪽
-                  </button>
-                  <button
-                    type="button"
-                    className={item.doorHinge === 'right' ? 'active' : ''}
-                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
-                  >
-                    오른쪽
-                  </button>
-                </div>
-              </div>
-              <div className="control-group">
-                <span>방향</span>
-                <div className="segment-control">
-                  <button
-                    type="button"
-                    className={item.doorSwingDir === 'front' ? 'active' : ''}
-                    onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'front' })}
-                  >
-                    앞쪽
-                  </button>
-                  <button
-                    type="button"
-                    className={item.doorSwingDir === 'back' ? 'active' : ''}
-                    onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'back' })}
-                  >
-                    뒤쪽
-                  </button>
-                </div>
+          <div className="door-swing-controls">
+            <div className="control-group">
+              <span>경첩</span>
+              <div className="segment-control">
+                <button
+                  type="button"
+                  className={item.doorHinge === 'left' ? 'active' : ''}
+                  onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
+                >
+                  왼쪽
+                </button>
+                <button
+                  type="button"
+                  className={item.doorHinge === 'right' ? 'active' : ''}
+                  onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
+                >
+                  오른쪽
+                </button>
               </div>
             </div>
-          )}
+            <div className="control-group">
+              <span>방향</span>
+              <div className="segment-control">
+                <button
+                  type="button"
+                  className={item.doorSwingDir === 'front' ? 'active' : ''}
+                  onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'front' })}
+                >
+                  앞쪽
+                </button>
+                <button
+                  type="button"
+                  className={item.doorSwingDir === 'back' ? 'active' : ''}
+                  onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'back' })}
+                >
+                  뒤쪽
+                </button>
+              </div>
+            </div>
+            <div className="control-group">
+              <label htmlFor="doorOpenAngle">
+                <span>열림각</span>
+                <span>{item.doorOpenAngle ?? 90}°</span>
+              </label>
+              <input
+                id="doorOpenAngle"
+                type="range"
+                min="0"
+                max="120"
+                value={item.doorOpenAngle ?? 90}
+                onChange={(e) => onUpdateDoorSwing(item.id, { doorOpenAngle: Number(e.target.value) })}
+              />
+            </div>
+          </div>
         </div>
       )}
 

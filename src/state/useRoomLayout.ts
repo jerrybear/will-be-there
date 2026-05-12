@@ -27,6 +27,7 @@ const MIN_FURNITURE_SIZE = 20;
 const MIN_OBJECT_HEIGHT = 1;
 const MAX_OBJECT_HEIGHT = 4000;
 const MAX_OBJECT_ELEVATION = 4000;
+const MAX_DOOR_OPEN_ANGLE = 120;
 const MAX_HISTORY_LENGTH = 80;
 
 interface LayoutHistorySnapshot {
@@ -246,6 +247,10 @@ function applyFurnitureGeometry(
 
 function normalizeWallHeight(value: number) {
   return Math.max(MIN_OBJECT_HEIGHT, Math.round(value));
+}
+
+function normalizeDoorOpenAngle(value: number) {
+  return clamp(Math.round(value), 0, MAX_DOOR_OPEN_ANGLE);
 }
 
 function normalizeRoomSize(width: number, height: number, wallHeight: number): Room {
@@ -547,6 +552,10 @@ export function useRoomLayout() {
       height: template.height,
       rotation: 0,
       isWallAttached: template.isWallAttached,
+      doorHinge: template.kind === 'door' ? 'left' : undefined,
+      doorSwingDir: template.kind === 'door' ? 'front' : undefined,
+      showDoorSwing: template.kind === 'door' ? false : undefined,
+      doorOpenAngle: template.kind === 'door' ? 90 : undefined,
       x: 24 + offset * 28,
       y: 24 + offset * 28,
     };
@@ -661,7 +670,7 @@ export function useRoomLayout() {
     );
   };
 
-  const updateDoorSwing = (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing'>>) => {
+  const updateDoorSwing = (id: string, updates: Partial<Pick<PlacedFurniture, 'doorHinge' | 'doorSwingDir' | 'showDoorSwing' | 'doorOpenAngle'>>) => {
     recordHistory();
     setItems((currentItems) =>
       currentItems.map((item) => {
@@ -669,6 +678,9 @@ export function useRoomLayout() {
         return {
           ...item,
           ...updates,
+          doorOpenAngle: updates.doorOpenAngle === undefined
+            ? item.doorOpenAngle
+            : normalizeDoorOpenAngle(updates.doorOpenAngle),
         };
       }),
     );

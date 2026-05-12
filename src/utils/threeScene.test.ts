@@ -111,4 +111,102 @@ describe('threeScene detailed models', () => {
 
     expect(geometry.boundingBox?.max.y).toBeCloseTo(3.2, 3);
   });
+
+  it('adds a 3D door leaf only for the selected door', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const door: PlacedFurniture = {
+      id: 'door-1',
+      templateId: 'door',
+      label: '방문',
+      color: '#ffffff',
+      kind: 'door',
+      threeModel: 'box',
+      objectHeight: 210,
+      elevation: 0,
+      width: 90,
+      height: 7,
+      rotation: 0,
+      x: 0,
+      y: 120,
+      isWallAttached: true,
+      wallSegmentId: 'point-3-point-0',
+      doorHinge: 'left',
+      doorSwingDir: 'front',
+      doorOpenAngle: 90,
+    };
+
+    const sceneObjects = createRoomSceneObjects(room, [door], door.id);
+    const wallObjects = sceneObjects.filter((object) => object.userData.wallSegmentId);
+    const doorWall = wallObjects.find((object) => object.userData.wallSegmentId === 'point-3-point-0');
+
+    expect(doorWall?.children.some((child) => child.userData.doorLeafFor === door.id)).toBe(true);
+  });
+
+  it('uses the door thickness value for the 3D door leaf', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const door: PlacedFurniture = {
+      id: 'door-1',
+      templateId: 'door',
+      label: '방문',
+      color: '#ffffff',
+      kind: 'door',
+      threeModel: 'box',
+      objectHeight: 210,
+      elevation: 0,
+      width: 90,
+      height: 7,
+      rotation: 0,
+      x: 0,
+      y: 120,
+      isWallAttached: true,
+      wallSegmentId: 'point-3-point-0',
+      doorHinge: 'left',
+      doorSwingDir: 'front',
+      doorOpenAngle: 90,
+    };
+
+    const sceneObjects = createRoomSceneObjects(room, [door], door.id);
+    const wallObjects = sceneObjects.filter((object) => object.userData.wallSegmentId);
+    const doorWall = wallObjects.find((object) => object.userData.wallSegmentId === 'point-3-point-0');
+    const leafMesh = doorWall?.children
+      .find((child) => child.userData.doorLeafFor === door.id)
+      ?.children.find((child) => child.userData.isDoorLeaf) as THREE.Mesh | undefined;
+    const geometry = leafMesh?.geometry as THREE.BoxGeometry | undefined;
+
+    expect(geometry?.parameters.depth).toBeCloseTo(0.07, 3);
+  });
+
+  it('matches 2D swing semantics for left hinge front swing in 3D', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const door: PlacedFurniture = {
+      id: 'door-1',
+      templateId: 'door',
+      label: '방문',
+      color: '#ffffff',
+      kind: 'door',
+      threeModel: 'box',
+      objectHeight: 210,
+      elevation: 0,
+      width: 90,
+      height: 7,
+      rotation: 0,
+      x: 0,
+      y: 120,
+      isWallAttached: true,
+      wallSegmentId: 'point-0-point-1',
+      doorHinge: 'left',
+      doorSwingDir: 'front',
+      doorOpenAngle: 90,
+    };
+
+    const sceneObjects = createRoomSceneObjects(room, [door], door.id);
+    const doorWall = sceneObjects
+      .filter((object) => object.userData.wallSegmentId)
+      .find((object) => object.userData.wallSegmentId === 'point-0-point-1');
+    const pivot = doorWall?.children.find((child) => child.userData.doorLeafFor === door.id) as THREE.Group | undefined;
+    const leafMesh = pivot?.children.find((child) => child.userData.isDoorLeaf) as THREE.Mesh | undefined;
+
+    expect(pivot?.rotation.y).toBeCloseTo(Math.PI / 2, 3);
+    expect(leafMesh?.position.z).toBeLessThan(0);
+  });
 });

@@ -75,6 +75,7 @@ export interface PlacedFurniture extends Size, Position {
   doorHinge?: 'left' | 'right';
   doorSwingDir?: 'front' | 'back';
   showDoorSwing?: boolean;
+  doorOpenAngle?: number;
 }
 
 export interface LayoutNote extends Position {

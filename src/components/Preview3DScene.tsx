@@ -85,6 +85,8 @@ function configureDirectionalLightShadow(light: THREE.DirectionalLight, room: Ro
 export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const directionalLightRef = useRef<THREE.DirectionalLight | null>(null);
+  const cameraOrbitRef = useRef<{ yaw: number; pitch: number; distance: number } | null>(null);
+  const lastCameraPresetRef = useRef<CameraPreset>('fit');
   
   const [cameraPreset, setCameraPreset] = useState<CameraPreset>('fit');
   const [lightAzimuth, setLightAzimuth] = useState(135);
@@ -154,18 +156,27 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
     let previousX = 0;
     let previousY = 0;
     const initialCamera = cameraPresets[cameraPreset];
-    let yaw = initialCamera.yaw;
-    let pitch = initialCamera.pitch;
-    let distance = getFitDistance(room, 1, cameraPreset);
+    const shouldResetOrbit = lastCameraPresetRef.current !== cameraPreset || !cameraOrbitRef.current;
+    const orbitState = shouldResetOrbit
+      ? null
+      : cameraOrbitRef.current;
+    let yaw = orbitState ? orbitState.yaw : initialCamera.yaw;
+    let pitch = orbitState ? orbitState.pitch : initialCamera.pitch;
+    let distance = shouldResetOrbit
+      ? getFitDistance(room, 1, cameraPreset)
+      : (orbitState ? orbitState.distance : getFitDistance(room, 1, cameraPreset));
+    lastCameraPresetRef.current = cameraPreset;
 
     const updateCamera = () => {
       const clampedPitch = Math.max(0.34, Math.min(1.18, pitch));
+      pitch = clampedPitch;
       camera.position.set(
         Math.cos(yaw) * Math.cos(clampedPitch) * distance,
         Math.sin(clampedPitch) * distance,
         Math.sin(yaw) * Math.cos(clampedPitch) * distance,
       );
       camera.lookAt(0, framing.height * 0.38, 0);
+      cameraOrbitRef.current = { yaw, pitch: clampedPitch, distance };
     };
 
     const render = () => {

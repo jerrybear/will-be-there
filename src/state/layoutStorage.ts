@@ -5,7 +5,7 @@ import { createRectRoomShape, DEFAULT_WALL_HEIGHT, normalizeRoomShapePointIds } 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
 const CUSTOM_FURNITURE_STORAGE_KEY = 'virtual-room-layout:custom-furniture-catalog';
-export const CURRENT_SCHEMA_VERSION = 7;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 interface StoredLayoutsPayload {
   schemaVersion: number;
@@ -171,9 +171,12 @@ function migratePlacedFurniture(item: PlacedFurniture): PlacedFurniture {
     isWallAttached: item.isWallAttached ?? (kind === 'door' || kind === 'window'),
     wallSegmentId: item.wallSegmentId,
     wallRotationOffset: item.wallRotationOffset ?? 0,
-    doorHinge: item.doorHinge,
-    doorSwingDir: item.doorSwingDir,
+    doorHinge: kind === 'door' ? (item.doorHinge ?? 'left') : item.doorHinge,
+    doorSwingDir: kind === 'door' ? (item.doorSwingDir ?? 'front') : item.doorSwingDir,
     showDoorSwing: item.showDoorSwing ?? false,
+    doorOpenAngle: kind === 'door'
+      ? Math.max(0, Math.min(120, Math.round(item.doorOpenAngle ?? 90)))
+      : item.doorOpenAngle,
   };
 }
 

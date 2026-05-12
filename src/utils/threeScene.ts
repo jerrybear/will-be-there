@@ -78,12 +78,18 @@ interface WallOpening {
   centerAlongWall: number;
   /** Opening width in room units */
   width: number;
+  /** Door/window thickness in room units */
+  depth: number;
   /** Opening height in room units */
   height: number;
   /** Elevation from floor in room units */
   elevation: number;
   /** Whether this is a window (to add glass panel) */
   isWindow: boolean;
+  isDoor: boolean;
+  doorHinge?: 'left' | 'right';
+  doorSwingDir?: 'front' | 'back';
+  doorOpenAngle?: number;
 }
 
 /**
@@ -129,9 +135,14 @@ function getOpeningsByWall(
       itemId: item.id,
       centerAlongWall,
       width: item.width,
+      depth: item.height,
       height: item.objectHeight,
       elevation: item.elevation,
       isWindow: item.kind === 'window',
+      isDoor: item.kind === 'door',
+      doorHinge: item.doorHinge,
+      doorSwingDir: item.doorSwingDir,
+      doorOpenAngle: item.doorOpenAngle,
     };
 
     const existing = map.get(segment.id);
@@ -265,6 +276,63 @@ function createOpeningOutline(
   return new THREE.LineSegments(geometry, material);
 }
 
+function createDoorLeaf(
+  wallLength: number,
+  wallHeight: number,
+  opening: WallOpening,
+  wallThickness: number,
+): THREE.Group | null {
+  if (!opening.isDoor) {
+    return null;
+  }
+
+  const halfW = toWorldLength(opening.width) / 2;
+  const center = toWorldLength(opening.centerAlongWall);
+  const left = Math.max(0, center - halfW);
+  const right = Math.min(wallLength, center + halfW);
+  const bottom = toWorldLength(opening.elevation);
+  const top = Math.min(wallHeight, toWorldLength(opening.elevation + opening.height));
+  const panelWidth = right - left;
+  const panelHeight = top - bottom;
+
+  if (panelWidth < 0.001 || panelHeight < 0.001) {
+    return null;
+  }
+
+  const leafThickness = Math.max(toWorldLength(opening.depth), toWorldLength(4));
+  const hinge = opening.doorHinge ?? 'left';
+  const swingDir = opening.doorSwingDir ?? 'front';
+  const openAngle = THREE.MathUtils.degToRad(opening.doorOpenAngle ?? 90);
+  const hingeOffsetX = hinge === 'left' ? left - wallLength / 2 : right - wallLength / 2;
+  const panelOffsetX = hinge === 'left' ? panelWidth / 2 : -panelWidth / 2;
+  const panelOffsetZ = swingDir === 'front'
+    ? -leafThickness / 2
+    : leafThickness / 2;
+  const rotationDirection = hinge === 'left'
+    ? (swingDir === 'front' ? 1 : -1)
+    : (swingDir === 'front' ? -1 : 1);
+
+  const pivot = new THREE.Group();
+  pivot.userData.doorLeafFor = opening.itemId;
+  pivot.userData.doorLeafOpenAngle = opening.doorOpenAngle ?? 90;
+
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xf8fafc,
+    roughness: 0.74,
+    metalness: 0.04,
+  });
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(panelWidth, panelHeight, leafThickness), material);
+  leaf.castShadow = true;
+  leaf.receiveShadow = true;
+  leaf.userData.isDoorLeaf = true;
+  leaf.position.set(panelOffsetX, bottom + panelHeight / 2, panelOffsetZ);
+  pivot.position.set(hingeOffsetX, 0, 0);
+  pivot.rotation.y = rotationDirection * openAngle;
+  pivot.add(leaf);
+
+  return pivot;
+}
+
 export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedId: string | null = null) {
   const segments = getRoomWallSegments(room);
   const openingsMap = getOpeningsByWall(room, items, segments);
@@ -338,6 +406,14 @@ export function createWallMeshes(room: Room, items: PlacedFurniture[], selectedI
       }
 
       if (opening.itemId === selectedId) {
+        if (opening.isDoor) {
+          const doorLeaf = createDoorLeaf(segmentLength, wallHeight, opening, wallThickness);
+
+          if (doorLeaf) {
+            group.add(doorLeaf);
+          }
+        }
+
         const outline = createOpeningOutline(segmentLength, wallHeight, opening, wallThickness);
 
         if (outline) {
