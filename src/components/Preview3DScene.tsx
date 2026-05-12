@@ -93,6 +93,7 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
   const [lightElevation, setLightElevation] = useState(45);
   const [activeLightPreset, setActiveLightPreset] = useState<LightPreset | null>('soft');
   const [isWallFadeEnabled, setIsWallFadeEnabled] = useState(true);
+  const [isAdvancedLightControlsOpen, setIsAdvancedLightControlsOpen] = useState(false);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -268,94 +269,94 @@ export function Preview3DScene({ room, items, selectedId }: Preview3DSceneProps)
         <p>현재 방과 배치안을 3D로 확인합니다.</p>
       </div>
 
-      <div className="preview-scene" ref={mountRef} />
-      
-      <div className="scene-controls-panel">
-        <section className="scene-control-section">
-          <h3 className="light-controls-title">카메라</h3>
-          <div className="preset-button-grid">
-            {(Object.entries(cameraPresets) as Array<[CameraPreset, typeof cameraPresets[CameraPreset]]>).map(([preset, config]) => (
-              <button
-                key={preset}
-                type="button"
-                className={cameraPreset === preset ? 'is-active' : ''}
-                onClick={() => setCameraPreset(preset)}
-              >
-                {config.label}
-              </button>
-            ))}
-          </div>
-        </section>
+      <div className="preview-scene-shell">
+        <div className="preview-scene" ref={mountRef} />
 
-        <section className="scene-control-section">
-          <h3 className="light-controls-title">조명</h3>
-          <div className="preset-button-grid">
-            {(Object.entries(lightPresets) as Array<[LightPreset, typeof lightPresets[LightPreset]]>).map(([preset, config]) => (
-              <button
-                key={preset}
-                type="button"
-                className={activeLightPreset === preset ? 'is-active' : ''}
-                onClick={() => applyLightPreset(preset)}
-              >
-                {config.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="scene-control-section">
-          <h3 className="light-controls-title">벽 보기</h3>
-          <div className="preset-button-grid preview-toggle-grid">
+        <div className="preview-top-toolbar">
+          {(Object.entries(cameraPresets) as Array<[CameraPreset, typeof cameraPresets[CameraPreset]]>).map(([preset, config]) => (
             <button
+              key={preset}
               type="button"
-              className={isWallFadeEnabled ? 'is-active' : ''}
-              onClick={() => setIsWallFadeEnabled(true)}
+              className={cameraPreset === preset ? 'is-active' : ''}
+              onClick={() => setCameraPreset(preset)}
             >
-              자동 투명
+              {config.label}
             </button>
-            <button
-              type="button"
-              className={!isWallFadeEnabled ? 'is-active' : ''}
-              onClick={() => setIsWallFadeEnabled(false)}
-            >
-              불투명
-            </button>
-          </div>
-        </section>
-
-        <div className="control-group">
-          <label htmlFor="lightAzimuth">
-            <span>방향</span>
-            <span>{lightAzimuth}°</span>
-          </label>
-          <input 
-            id="lightAzimuth" 
-            type="range" 
-            min="0" 
-            max="360" 
-            value={lightAzimuth} 
-            onChange={(e) => {
-              setActiveLightPreset(null);
-              setLightAzimuth(Number(e.target.value));
-            }} 
-          />
+          ))}
         </div>
-        <div className="control-group">
-          <label htmlFor="lightElevation">
-            <span>높이</span>
-            <span>{lightElevation}°</span>
-          </label>
-          <input 
-            id="lightElevation" 
-            type="range" 
-            min="10" 
-            max="80" 
-            value={lightElevation} 
-            onChange={(e) => {
-              setActiveLightPreset(null);
-              setLightElevation(Number(e.target.value));
-            }} 
-          />
+
+        <div className="preview-view-controls">
+          <button
+            type="button"
+            className={`preview-view-control ${isWallFadeEnabled ? 'is-active' : ''}`}
+            onClick={() => setIsWallFadeEnabled((currentValue) => !currentValue)}
+          >
+            {isWallFadeEnabled ? '자동 투명' : '불투명'}
+          </button>
+          <button
+            type="button"
+            className={`preview-view-control ${isAdvancedLightControlsOpen ? 'is-active' : ''}`}
+            onClick={() => setIsAdvancedLightControlsOpen((currentValue) => !currentValue)}
+          >
+            {isAdvancedLightControlsOpen ? '조명 상세' : '조명'}
+          </button>
+
+          {isAdvancedLightControlsOpen && (
+            <div className="preview-view-panel">
+              <section className="scene-control-section scene-control-compact">
+                <h3 className="light-controls-title">조명 프리셋</h3>
+                <div className="preset-button-grid">
+                  {(Object.entries(lightPresets) as Array<[LightPreset, typeof lightPresets[LightPreset]]>).map(([preset, config]) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={activeLightPreset === preset ? 'is-active' : ''}
+                      onClick={() => applyLightPreset(preset)}
+                    >
+                      {config.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <div className="scene-advanced-controls">
+                <div className="control-group">
+                  <label htmlFor="lightAzimuth">
+                    <span>방향</span>
+                    <span>{lightAzimuth}°</span>
+                  </label>
+                  <input 
+                    id="lightAzimuth" 
+                    type="range" 
+                    min="0" 
+                    max="360" 
+                    value={lightAzimuth} 
+                    onChange={(e) => {
+                      setActiveLightPreset(null);
+                      setLightAzimuth(Number(e.target.value));
+                    }} 
+                  />
+                </div>
+                <div className="control-group">
+                  <label htmlFor="lightElevation">
+                    <span>높이</span>
+                    <span>{lightElevation}°</span>
+                  </label>
+                  <input 
+                    id="lightElevation" 
+                    type="range" 
+                    min="10" 
+                    max="80" 
+                    value={lightElevation} 
+                    onChange={(e) => {
+                      setActiveLightPreset(null);
+                      setLightElevation(Number(e.target.value));
+                    }} 
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </section>

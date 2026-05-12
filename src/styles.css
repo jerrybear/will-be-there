@@ -1191,15 +1191,50 @@ textarea {
 .preview-panel {
   position: relative;
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto;
   min-height: 0;
   overflow: hidden;
 }
 
+.preview-scene-shell {
+  position: relative;
+}
+
+.preview-top-toolbar,
+.preview-view-controls {
+  position: absolute;
+  z-index: 5;
+  border: 1px solid rgba(203, 213, 225, 0.95);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.preview-top-toolbar {
+  top: 20px;
+  left: 50%;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.84);
+  border-radius: 16px;
+  transform: translateX(-50%);
+}
+
+.preview-view-controls {
+  top: 20px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.84);
+  border-radius: 16px;
+}
+
 .preview-scene {
   width: 100%;
-  min-height: 360px;
-  height: min(56vh, 560px);
+  min-height: 540px;
+  height: min(72vh, 820px);
   overflow: hidden;
   background: linear-gradient(180deg, #eef3f8 0%, #e2e8f0 100%);
 }
@@ -1216,20 +1251,13 @@ textarea {
   cursor: grabbing;
 }
 
-.scene-controls-panel {
-  position: relative;
-  width: auto;
-  display: grid;
-  gap: 12px;
-  margin: 16px;
-  padding: 14px 16px 16px;
-  border-top: 1px solid #e2e8f0;
-  background: rgba(255, 255, 255, 0.72);
-}
-
 .scene-control-section {
   display: grid;
   gap: 10px;
+}
+
+.scene-control-compact {
+  gap: 8px;
 }
 
 .light-controls-title {
@@ -1247,21 +1275,52 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.preview-top-toolbar button,
+.preview-view-control,
 .preset-button-grid button {
   min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--outline);
   border-radius: 12px;
-  background: var(--surface-panel);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--text-muted);
   cursor: pointer;
   font-size: 12px;
 }
 
+.preview-view-control {
+  display: inline-flex;
+  align-items: center;
+  min-width: 82px;
+}
+
+.preview-top-toolbar button.is-active,
+.preview-view-control.is-active,
 .preset-button-grid button.is-active {
   background: #dbeafe;
   border-color: #93c5fd;
   color: var(--primary-strong);
   font-weight: 700;
+}
+
+.preview-view-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  gap: 12px;
+  min-width: 300px;
+  padding: 14px;
+  border: 1px solid var(--outline);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+}
+
+.scene-advanced-controls {
+  display: grid;
+  gap: 12px;
+  padding-top: 4px;
 }
 
 @keyframes intersection-pulse {
@@ -1402,13 +1461,26 @@ textarea {
   }
 
   .preview-scene {
-    min-height: 280px;
-    height: min(44vh, 420px);
+    min-height: 420px;
+    height: min(60vh, 620px);
   }
 
-  .scene-controls-panel {
-    margin: 14px;
-    padding: 14px;
+  .preview-top-toolbar {
+    top: 16px;
+    left: 16px;
+    justify-content: flex-start;
+    overflow-x: auto;
+    transform: translateX(0);
+  }
+
+  .preview-view-controls {
+    top: 16px;
+    right: 16px;
+  }
+
+  .preview-top-toolbar button,
+  .preview-view-control {
+    flex: 0 0 auto;
   }
 }
 
@@ -1572,9 +1644,41 @@ textarea {
     max-width: none;
   }
 
+  .preview-top-toolbar {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    padding: 5px;
+    border-radius: 14px;
+    transform: none;
+  }
+
+  .preview-top-toolbar button {
+    min-width: 68px;
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  .preview-view-controls {
+    top: 58px;
+    right: 12px;
+    padding: 5px;
+    border-radius: 14px;
+  }
+
+  .preview-view-control {
+    min-width: 64px;
+    min-height: 34px;
+    padding: 0 10px;
+  }
+
+  .preview-view-panel {
+    min-width: min(300px, calc(100vw - 48px));
+  }
+
   .preview-scene {
-    min-height: 240px;
-    height: min(38vh, 340px);
+    min-height: 320px;
+    height: min(48vh, 460px);
   }
 }
 
@@ -1589,8 +1693,7 @@ textarea {
   }
 
   .panel-header,
-  .palette-footer,
-  .scene-controls-panel {
+  .palette-footer {
     padding-left: 14px;
     padding-right: 14px;
   }
@@ -1616,7 +1719,12 @@ textarea {
   }
 
   .preview-scene {
-    min-height: 220px;
-    height: min(34vh, 300px);
+    min-height: 260px;
+    height: min(38vh, 340px);
+  }
+
+  .preview-view-panel {
+    right: -4px;
+    min-width: min(280px, calc(100vw - 36px));
   }
 }
