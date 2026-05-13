@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { FurniturePalette } from './components/FurniturePalette';
 import { InspectorPanel } from './components/InspectorPanel';
 import { RoomCanvas } from './components/RoomCanvas';
@@ -14,6 +14,7 @@ const Preview3DScene = lazy(() =>
 export default function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('2d');
   const [isRoomEditingEnabled, setIsRoomEditingEnabled] = useState(false);
+  const [shareStatusMessage, setShareStatusMessage] = useState<string | null>(null);
   const {
     room,
     catalog,
@@ -23,6 +24,8 @@ export default function App() {
     selectedItem,
     currentLayout,
     currentRoom,
+    currentLayoutName,
+    sharedLayoutError,
     hasUnsavedChanges,
     hasUnsavedRoomChanges,
     overlappingItemIds,
@@ -73,7 +76,46 @@ export default function App() {
     redoLayoutChange,
     copyFurniture,
     pasteFurniture,
+    buildShareLink,
+    clearSharedLayoutError,
   } = useRoomLayout();
+
+  useEffect(() => {
+    if (!sharedLayoutError) {
+      return;
+    }
+
+    setShareStatusMessage(sharedLayoutError);
+    clearSharedLayoutError();
+  }, [clearSharedLayoutError, sharedLayoutError]);
+
+  useEffect(() => {
+    if (!shareStatusMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShareStatusMessage(null);
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [shareStatusMessage]);
+
+  const handleCopyShareLink = async () => {
+    try {
+      const shareUrl = buildShareLink();
+
+      if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+        setShareStatusMessage('클립보드 복사를 지원하지 않는 환경입니다.');
+        return;
+      }
+
+      await navigator.clipboard.writeText(shareUrl);
+      setShareStatusMessage('공유 링크를 복사했습니다.');
+    } catch {
+      setShareStatusMessage('공유 링크를 만들지 못했습니다.');
+    }
+  };
 
   useKeyboardShortcuts({
     selectedId,
@@ -97,7 +139,8 @@ export default function App() {
         viewMode={viewMode}
         savedLayouts={savedLayouts}
         currentLayoutId={currentLayout?.id ?? null}
-        currentLayoutName={currentLayout?.name ?? null}
+        currentLayoutName={currentLayoutName}
+        shareStatusMessage={shareStatusMessage}
         hasUnsavedChanges={hasUnsavedChanges}
         canUndo={canUndo}
         canRedo={canRedo}
@@ -109,6 +152,7 @@ export default function App() {
         onDelete={deleteLayout}
         onUpdateMeta={updateLayoutMeta}
         onSaveCurrent={updateCurrentLayout}
+        onCopyShareLink={handleCopyShareLink}
       />
 
       <main className="workspace-grid">

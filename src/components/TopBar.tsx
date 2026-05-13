@@ -38,6 +38,7 @@ interface TopBarProps {
   savedLayouts: SavedLayout[];
   currentLayoutId: string | null;
   currentLayoutName: string | null;
+  shareStatusMessage: string | null;
   hasUnsavedChanges: boolean;
   canUndo: boolean;
   canRedo: boolean;
@@ -49,6 +50,7 @@ interface TopBarProps {
   onDelete: (id: string) => void;
   onUpdateMeta: (id: string, name: string, memo: string) => void;
   onSaveCurrent: () => void;
+  onCopyShareLink: () => void;
 }
 
 function formatSavedTime(value: string) {
@@ -65,6 +67,7 @@ export function TopBar({
   savedLayouts,
   currentLayoutId,
   currentLayoutName,
+  shareStatusMessage,
   hasUnsavedChanges,
   canUndo,
   canRedo,
@@ -76,6 +79,7 @@ export function TopBar({
   onDelete,
   onUpdateMeta,
   onSaveCurrent,
+  onCopyShareLink,
 }: TopBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isShortcutOpen, setIsShortcutOpen] = useState(false);
@@ -123,6 +127,7 @@ export function TopBar({
         <div className="top-bar-title-row">
           <h1>이거여기</h1>
           <span className="top-bar-chip">{viewMode === '2d' ? '2D 편집' : '3D 미리보기'}</span>
+          {shareStatusMessage ? <span className="top-bar-chip">{shareStatusMessage}</span> : null}
         </div>
         <p>{currentLayoutName ? `${currentLayoutName}${hasUnsavedChanges ? ' · 수정됨' : ''}` : '옮기기 전에, 여기 한번 놔 보기'}</p>
       </div>
@@ -276,6 +281,9 @@ export function TopBar({
           </div>
           <button type="button" className="ghost-button top-bar-pill-button" onClick={onReset}>
             초기화
+          </button>
+          <button type="button" className="ghost-button top-bar-pill-button" onClick={onCopyShareLink}>
+            공유 링크 복사
           </button>
           <button
             type="button"

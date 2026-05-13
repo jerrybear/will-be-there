@@ -51,6 +51,46 @@ describe('threeScene detailed models', () => {
     expect(group.children.some((child) => child instanceof THREE.Mesh)).toBe(true);
   });
 
+  it('renders a detailed wide dresser model with multiple meshes', () => {
+    const group = getFurnitureGroup({
+      id: 'dresser-wide-1',
+      templateId: 'argian-wide-chest-1200',
+      label: '아르지안 3단 와이드체스트 1200폭',
+      color: '#d9d0c6',
+      kind: 'furniture',
+      threeModel: 'dresser_wide_3',
+      objectHeight: 75.3,
+      elevation: 0,
+      width: 120,
+      height: 52,
+      rotation: 0,
+      x: 20,
+      y: 20,
+    });
+
+    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(4);
+  });
+
+  it('renders a media console with open center section', () => {
+    const group = getFurnitureGroup({
+      id: 'media-console-1',
+      templateId: 'argian-media-console-1600',
+      label: '아르지안 AV장 1600폭',
+      color: '#d8cfc5',
+      kind: 'furniture',
+      threeModel: 'media_console',
+      objectHeight: 55,
+      elevation: 0,
+      width: 160,
+      height: 41,
+      rotation: 0,
+      x: 20,
+      y: 20,
+    });
+
+    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(5);
+  });
+
   it('selects the nearest front wall for auto fade', () => {
     const room = createRectRoom(720, 480) as Room;
     const cameraPosition = new THREE.Vector3(0, 1, 5);
@@ -140,6 +180,8 @@ describe('threeScene detailed models', () => {
     const doorWall = wallObjects.find((object) => object.userData.wallSegmentId === 'point-3-point-0');
 
     expect(doorWall?.children.some((child) => child.userData.doorLeafFor === door.id)).toBe(true);
+    const pivot = doorWall?.children.find((child) => child.userData.doorLeafFor === door.id) as THREE.Group | undefined;
+    expect(pivot?.children.some((child) => child.userData.isDoorHandle)).toBe(true);
   });
 
   it('uses the door thickness value for the 3D door leaf', () => {

@@ -15,7 +15,8 @@ import {
   rectFromItem,
   rectsOverlap,
 } from '../utils/geometry';
-import { loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureCatalog, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
+import { CURRENT_SCHEMA_VERSION, loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureCatalog, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
+import { buildSharedLayoutUrl, createSharedLayoutPayload, createShareSnapshot, loadSharedLayoutFromHash } from './sharedLayout';
 
 const DEFAULT_ROOM: Room = createRectRoom(7200, 4800);
 
@@ -383,9 +384,14 @@ function normalizeLayoutForComparison(roomValue: Room, itemsValue: PlacedFurnitu
 export function useRoomLayout() {
   const initialWorkspaceState = useMemo(() => loadWorkspaceState(), []);
   const initialCustomFurnitureCatalog = useMemo(() => loadCustomFurnitureCatalog(), []);
-  const [room, setRoom] = useState<Room>(DEFAULT_ROOM);
-  const [items, setItems] = useState<PlacedFurniture[]>([]);
-  const [notes, setNotes] = useState<LayoutNote[]>([]);
+  const initialSharedLayoutState = useMemo(() => loadSharedLayoutFromHash(), []);
+  const initialShareSnapshot = useMemo(
+    () => (initialSharedLayoutState.payload ? createShareSnapshot(initialSharedLayoutState.payload) : null),
+    [initialSharedLayoutState],
+  );
+  const [room, setRoom] = useState<Room>(() => initialShareSnapshot?.room ?? DEFAULT_ROOM);
+  const [items, setItems] = useState<PlacedFurniture[]>(() => initialShareSnapshot?.items ?? []);
+  const [notes, setNotes] = useState<LayoutNote[]>(() => initialShareSnapshot?.notes ?? []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<PlacedFurniture | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
@@ -396,6 +402,12 @@ export function useRoomLayout() {
   const [currentLayoutId, setCurrentLayoutId] = useState<string | null>(null);
   const [pastLayouts, setPastLayouts] = useState<LayoutHistorySnapshot[]>([]);
   const [futureLayouts, setFutureLayouts] = useState<LayoutHistorySnapshot[]>([]);
+  const [sharedLayoutName, setSharedLayoutName] = useState<string | null>(() => initialShareSnapshot?.layoutName ?? null);
+  const [sharedRoomName, setSharedRoomName] = useState<string | null>(() => initialShareSnapshot?.roomName ?? null);
+  const [sharedBaseline, setSharedBaseline] = useState<{ room: Room; items: PlacedFurniture[]; notes: LayoutNote[] } | null>(
+    () => (initialShareSnapshot ? { room: initialShareSnapshot.room, items: initialShareSnapshot.items, notes: initialShareSnapshot.notes } : null),
+  );
+  const [sharedLayoutError, setSharedLayoutError] = useState<string | null>(() => initialSharedLayoutState.error);
 
   const selectedItem = useMemo(
     () => items.find((item) => item.id === selectedId) ?? null,
@@ -419,6 +431,10 @@ export function useRoomLayout() {
 
   const hasUnsavedChanges = useMemo(() => {
     if (!currentLayout) {
+      if (sharedBaseline) {
+        return JSON.stringify(items) !== JSON.stringify(sharedBaseline.items) || JSON.stringify(notes) !== JSON.stringify(sharedBaseline.notes);
+      }
+
       return items.length > 0 || notes.length > 0;
     }
 
@@ -431,11 +447,15 @@ export function useRoomLayout() {
 
   const hasUnsavedRoomChanges = useMemo(() => {
     if (!currentRoom) {
+      if (sharedBaseline) {
+        return normalizeLayoutForComparison(room, []) !== normalizeLayoutForComparison(sharedBaseline.room, []);
+      }
+
       return normalizeLayoutForComparison(room, []) !== normalizeLayoutForComparison(DEFAULT_ROOM, []);
     }
 
     return normalizeLayoutForComparison(room, []) !== normalizeLayoutForComparison(currentRoom.room, []);
-  }, [currentRoom, room]);
+  }, [currentRoom, room, sharedBaseline]);
 
   const overlappingItemIds = useMemo(() => {
     const ids = new Set<string>();
@@ -1003,7 +1023,7 @@ export function useRoomLayout() {
 
     const now = new Date().toISOString();
     const nextRoom: SavedRoom = {
-      schemaVersion: 7,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       id: createSavedRoomId(),
       name: trimmedName,
       memo: memo.trim(),
@@ -1017,6 +1037,9 @@ export function useRoomLayout() {
       return nextRooms;
     });
     setCurrentRoomId(nextRoom.id);
+    setSharedBaseline(null);
+    setSharedLayoutName(null);
+    setSharedRoomName(null);
     return nextRoom.id;
   };
 
@@ -1055,6 +1078,9 @@ export function useRoomLayout() {
     setSelectedId(null);
     setCurrentRoomId(savedRoom.id);
     setCurrentLayoutId(null);
+    setSharedBaseline(null);
+    setSharedLayoutName(null);
+    setSharedRoomName(null);
   };
 
   const deleteRoom = (id: string) => {
@@ -1089,7 +1115,7 @@ export function useRoomLayout() {
     }
 
     const nextLayout: SavedLayout = {
-      schemaVersion: 7,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       notes,
       id: createSavedLayoutId(),
       roomId,
@@ -1106,6 +1132,9 @@ export function useRoomLayout() {
     });
     setCurrentRoomId(roomId);
     setCurrentLayoutId(nextLayout.id);
+    setSharedBaseline(null);
+    setSharedLayoutName(null);
+    setSharedRoomName(null);
   };
 
   const loadLayout = (id: string) => {
@@ -1132,6 +1161,9 @@ export function useRoomLayout() {
     setSelectedId(null);
     setCurrentRoomId(layoutRoom.id);
     setCurrentLayoutId(layout.id);
+    setSharedBaseline(null);
+    setSharedLayoutName(null);
+    setSharedRoomName(null);
   };
 
   const deleteLayout = (id: string) => {
@@ -1184,6 +1216,42 @@ export function useRoomLayout() {
     });
   };
 
+  const buildShareLink = () => {
+    const activeRoom: SavedRoom = currentRoom
+      ? {
+          ...currentRoom,
+          room,
+        }
+      : {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: currentRoomId ?? 'shared-room',
+          name: sharedRoomName ?? sharedLayoutName ?? '공유 방',
+          memo: '',
+          room,
+          updatedAt: new Date().toISOString(),
+        };
+
+    const activeLayout: SavedLayout = currentLayout
+      ? {
+          ...currentLayout,
+          roomId: activeRoom.id,
+          items,
+          notes,
+        }
+      : {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: currentLayoutId ?? 'shared-layout',
+          roomId: activeRoom.id,
+          name: sharedLayoutName ?? '공유 도면',
+          memo: '',
+          items,
+          notes,
+          updatedAt: new Date().toISOString(),
+        };
+
+    return buildSharedLayoutUrl(createSharedLayoutPayload(activeRoom, activeLayout));
+  };
+
   return {
     room,
     catalog,
@@ -1194,6 +1262,8 @@ export function useRoomLayout() {
     selectedItem,
     currentLayout,
     currentRoom,
+    currentLayoutName: currentLayout?.name ?? sharedLayoutName,
+    sharedLayoutError,
     hasUnsavedChanges,
     hasUnsavedRoomChanges,
     overlappingItemIds,
@@ -1245,5 +1315,7 @@ export function useRoomLayout() {
     redoLayoutChange,
     copyFurniture,
     pasteFurniture,
+    buildShareLink,
+    clearSharedLayoutError: () => setSharedLayoutError(null),
   };
 }

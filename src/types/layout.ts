@@ -4,7 +4,16 @@ export type LayoutElementKind = 'furniture' | 'door' | 'window';
 export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
 export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
-export type FurnitureThreeModel = 'box' | 'desk_neomin' | 'desk_four_leg' | 'bed_frame' | 'sofa_cushion';
+export type FurnitureThreeModel =
+  | 'box'
+  | 'desk_neomin'
+  | 'desk_four_leg'
+  | 'bed_frame'
+  | 'sofa_cushion'
+  | 'dresser_wide_3'
+  | 'dresser_tall_4'
+  | 'dresser_tall_5'
+  | 'media_console';
 export type CanvasTool = 'select' | 'walls' | 'memo';
 
 export interface Size {

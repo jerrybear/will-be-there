@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRoomLayout } from './useRoomLayout';
+import { CURRENT_SCHEMA_VERSION } from './layoutStorage';
+import { buildSharedLayoutUrl, createSharedLayoutPayload } from './sharedLayout';
+import { createRectRoom } from '../utils/geometry';
 
 describe('useRoomLayout hook', () => {
   let storageState: Record<string, string>;
 
   beforeEach(() => {
     storageState = {};
+    window.location.hash = '';
     vi.stubGlobal('localStorage', {
       getItem: vi.fn((key: string) => storageState[key] ?? null),
       setItem: vi.fn((key: string, value: string) => {
@@ -221,5 +225,51 @@ describe('useRoomLayout hook', () => {
     const storedLayouts = JSON.parse(storageState['virtual-room-layout:saved-layouts']);
     expect(storedLayouts.layouts[0].notes).toHaveLength(1);
     expect(storedLayouts.layouts[0].notes[0].text).toBe('침대 후보 위치');
+  });
+
+  it('should initialize from a shared link without merging into saved libraries', () => {
+    storageState['virtual-room-layout:saved-rooms'] = JSON.stringify({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      rooms: [
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: 'room-local',
+          name: '로컬 방',
+          memo: '',
+          room: createRectRoom(5000, 4000),
+          updatedAt: '2026-05-13T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const sharedRoom = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      id: 'room-shared',
+      name: '공유 방',
+      memo: '',
+      room: createRectRoom(7200, 4800),
+      updatedAt: '2026-05-13T01:00:00.000Z',
+    };
+    const sharedLayout = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      id: 'layout-shared',
+      roomId: sharedRoom.id,
+      name: '공유 도면',
+      memo: '',
+      items: [],
+      notes: [{ id: 'note-1', x: 10, y: 20, text: '공유 메모' }],
+      updatedAt: '2026-05-13T01:00:00.000Z',
+    };
+
+    window.location.hash = new URL(buildSharedLayoutUrl(createSharedLayoutPayload(sharedRoom, sharedLayout), 'http://localhost/')).hash;
+
+    const { result } = renderHook(() => useRoomLayout());
+
+    expect(result.current.currentLayoutName).toBe('공유 도면');
+    expect(result.current.room.width).toBe(7200);
+    expect(result.current.notes[0].text).toBe('공유 메모');
+    expect(result.current.savedRooms).toHaveLength(1);
+    expect(result.current.savedRooms[0].id).toBe('room-local');
+    expect(result.current.savedLayouts).toHaveLength(0);
   });
 });
