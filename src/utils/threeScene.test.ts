@@ -51,44 +51,26 @@ describe('threeScene detailed models', () => {
     expect(group.children.some((child) => child instanceof THREE.Mesh)).toBe(true);
   });
 
-  it('renders a detailed wide dresser model with multiple meshes', () => {
+  it('renders a tall bookshelf with visible shelf compartments', () => {
     const group = getFurnitureGroup({
-      id: 'dresser-wide-1',
-      templateId: 'argian-wide-chest-1200',
-      label: '아르지안 3단 와이드체스트 1200폭',
-      color: '#d9d0c6',
+      id: 'bookshelf-1',
+      templateId: 'full-height-bookshelf',
+      label: '대형 벽면 책장',
+      color: '#c9c1b6',
       kind: 'furniture',
-      threeModel: 'dresser_wide_3',
-      objectHeight: 75.3,
+      threeModel: 'bookshelf_tall',
+      objectHeight: 240,
       elevation: 0,
       width: 120,
-      height: 52,
+      height: 32,
       rotation: 0,
       x: 20,
       y: 20,
+      isWallAttached: true,
+      wallSegmentId: 'point-0-point-1',
     });
 
-    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(4);
-  });
-
-  it('renders a media console with open center section', () => {
-    const group = getFurnitureGroup({
-      id: 'media-console-1',
-      templateId: 'argian-media-console-1600',
-      label: '아르지안 AV장 1600폭',
-      color: '#d8cfc5',
-      kind: 'furniture',
-      threeModel: 'media_console',
-      objectHeight: 55,
-      elevation: 0,
-      width: 160,
-      height: 41,
-      rotation: 0,
-      x: 20,
-      y: 20,
-    });
-
-    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(5);
+    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(8);
   });
 
   it('selects the nearest front wall for auto fade', () => {

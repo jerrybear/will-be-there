@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { CanvasTool, LayoutNote, PlacedFurniture, Room, SnapSize } from '../types/layout';
+import { getRotatedSize } from '../types/layout';
 import { useCanvasViewport } from '../hooks/useCanvasViewport';
-import { getRoomOutlinePoints, getRoomShape, getSvgPoints } from '../utils/geometry';
+import { getRoomOutlinePoints, getRoomShape, getSvgPoints, normalizeRotation } from '../utils/geometry';
 import { CanvasFurnitureItem } from './CanvasFurnitureItem';
 
 const DISPLAY_SCALE = 0.2;
@@ -18,6 +19,7 @@ interface RoomCanvasProps {
   onSelect: (id: string | null) => void;
   onMoveStart: () => void;
   onMove: (id: string, x: number, y: number) => void;
+  onRotateTo: (id: string, rotation: number) => void;
   onRoomEditingChange: (enabled: boolean) => void;
   onRoomPointMoveStart: () => void;
   onRoomPointMove: (index: number, x: number, y: number) => void;
@@ -43,6 +45,14 @@ interface NoteDragState {
   id: string;
   pointerOffsetX: number;
   pointerOffsetY: number;
+}
+
+interface RotationDragState {
+  id: string;
+  centerX: number;
+  centerY: number;
+  startAngle: number;
+  initialRotation: number;
 }
 
 interface Point2D {
@@ -108,6 +118,10 @@ function getCornerAngleDegrees(previousPoint: Point2D, currentPoint: Point2D, ne
 
 function roundAngleForDisplay(angle: number) {
   return Math.round(angle * 100) / 100;
+}
+
+function getPointerAngleDegrees(point: Point2D, center: Point2D) {
+  return Math.atan2(point.y - center.y, point.x - center.x) * 180 / Math.PI;
 }
 
 function getDistanceSquared(a: Point2D, b: Point2D) {
@@ -313,6 +327,7 @@ export function RoomCanvas({
   onSelect,
   onMoveStart,
   onMove,
+  onRotateTo,
   onRoomEditingChange,
   onRoomPointMoveStart,
   onRoomPointMove,
@@ -327,6 +342,7 @@ export function RoomCanvas({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [pointDragState, setPointDragState] = useState<PointDragState | null>(null);
   const [noteDragState, setNoteDragState] = useState<NoteDragState | null>(null);
+  const [rotationDragState, setRotationDragState] = useState<RotationDragState | null>(null);
   const [activeTool, setActiveTool] = useState<CanvasTool>('select');
   const [showDimensions, setShowDimensions] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
@@ -424,6 +440,30 @@ export function RoomCanvas({
         };
       })
     : [];
+  const rotationHandleState = selectedItem?.kind === 'furniture' && activeTool === 'select'
+    ? (() => {
+        const footprint = getRotatedSize(selectedItem);
+        const centerX = selectedItem.x + footprint.width / 2;
+        const centerY = selectedItem.y + footprint.height / 2;
+        const rotatedCorner = rotateVector(
+          { x: selectedItem.width / 2, y: -selectedItem.height / 2 },
+          selectedItem.rotation,
+        );
+        const cornerLength = Math.hypot(rotatedCorner.x, rotatedCorner.y) || 1;
+        const outward = {
+          x: rotatedCorner.x / cornerLength,
+          y: rotatedCorner.y / cornerLength,
+        };
+
+        return {
+          centerX,
+          centerY,
+          handleX: centerX + rotatedCorner.x + outward.x * 26,
+          handleY: centerY + rotatedCorner.y + outward.y * 26,
+          angle: Math.round(selectedItem.rotation),
+        };
+      })()
+    : null;
 
   useEffect(() => {
     setActiveTool(isRoomEditingEnabled ? 'walls' : 'select');
@@ -543,6 +583,50 @@ export function RoomCanvas({
   }, [displayZoom, noteDragState, onUpdateNote]);
 
   useEffect(() => {
+    if (!rotationDragState) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const roomElement = roomRef.current;
+
+      if (!roomElement) {
+        return;
+      }
+
+      const roomRect = roomElement.getBoundingClientRect();
+      const point = {
+        x: (event.clientX - roomRect.left) / displayZoom,
+        y: (event.clientY - roomRect.top) / displayZoom,
+      };
+      const center = {
+        x: rotationDragState.centerX,
+        y: rotationDragState.centerY,
+      };
+      const currentAngle = getPointerAngleDegrees(point, center);
+      let nextRotation = normalizeRotation(rotationDragState.initialRotation + (currentAngle - rotationDragState.startAngle));
+
+      if (event.shiftKey) {
+        nextRotation = normalizeRotation(Math.round(nextRotation / 15) * 15);
+      }
+
+      onRotateTo(rotationDragState.id, nextRotation);
+    };
+
+    const handlePointerUp = () => {
+      setRotationDragState(null);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [displayZoom, onRotateTo, rotationDragState]);
+
+  useEffect(() => {
     const shell = shellRef.current;
 
     if (!shell) {
@@ -614,6 +698,41 @@ export function RoomCanvas({
       id: item.id,
       pointerOffsetX: (event.clientX - roomRect.left) / displayZoom - item.x,
       pointerOffsetY: (event.clientY - roomRect.top) / displayZoom - item.y,
+    });
+  };
+
+  const handleRotationHandlePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!selectedItem || selectedItem.kind !== 'furniture' || event.button !== 0 || !rotationHandleState) {
+      return;
+    }
+
+    const roomElement = roomRef.current;
+
+    if (!roomElement) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect(selectedItem.id);
+    setSelectedNoteId(null);
+    onMoveStart();
+
+    const roomRect = roomElement.getBoundingClientRect();
+    const point = {
+      x: (event.clientX - roomRect.left) / displayZoom,
+      y: (event.clientY - roomRect.top) / displayZoom,
+    };
+
+    setRotationDragState({
+      id: selectedItem.id,
+      centerX: rotationHandleState.centerX,
+      centerY: rotationHandleState.centerY,
+      startAngle: getPointerAngleDegrees(point, {
+        x: rotationHandleState.centerX,
+        y: rotationHandleState.centerY,
+      }),
+      initialRotation: selectedItem.rotation,
     });
   };
 
@@ -849,6 +968,36 @@ export function RoomCanvas({
                 onPointerDown={handleItemPointerDown}
               />
             ))}
+
+            {rotationHandleState && (
+              <>
+                <div
+                  className="rotation-handle-guide"
+                  style={{
+                    left: rotationHandleState.centerX,
+                    top: rotationHandleState.centerY,
+                    width: Math.hypot(
+                      rotationHandleState.handleX - rotationHandleState.centerX,
+                      rotationHandleState.handleY - rotationHandleState.centerY,
+                    ),
+                    transform: `translateY(-50%) rotate(${rotationHandleState.angle}deg)`,
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rotation-handle"
+                  style={{
+                    left: rotationHandleState.handleX,
+                    top: rotationHandleState.handleY,
+                    transform: `translate(-50%, -50%) scale(${1 / displayZoom})`,
+                  }}
+                  onPointerDown={handleRotationHandlePointerDown}
+                  title="드래그하여 회전"
+                >
+                  ↻
+                </button>
+              </>
+            )}
 
             {wallDimensionLabels.map((label) => (
               <div

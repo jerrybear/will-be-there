@@ -41,6 +41,7 @@ export default function App() {
     beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
+    setFurnitureRotation,
     renameFurniture,
     rotateFurniture,
     updateDoorSwing,
@@ -170,6 +171,7 @@ export default function App() {
             onSelect={selectFurniture}
             onMoveStart={beginFurnitureMove}
             onMove={moveFurniture}
+            onRotateTo={setFurnitureRotation}
             onRoomEditingChange={setIsRoomEditingEnabled}
             onRoomPointMoveStart={beginRoomShapeEdit}
             onRoomPointMove={moveRoomPoint}

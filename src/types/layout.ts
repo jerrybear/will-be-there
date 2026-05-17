@@ -10,10 +10,7 @@ export type FurnitureThreeModel =
   | 'desk_four_leg'
   | 'bed_frame'
   | 'sofa_cushion'
-  | 'dresser_wide_3'
-  | 'dresser_tall_4'
-  | 'dresser_tall_5'
-  | 'media_console';
+  | 'bookshelf_tall';
 export type CanvasTool = 'select' | 'walls' | 'memo';
 
 export interface Size {
@@ -96,6 +93,7 @@ export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position
   objectHeight?: number;
   elevation?: number;
   color?: string;
+  rotation?: Rotation;
 }
 
 export interface SavedRoom {

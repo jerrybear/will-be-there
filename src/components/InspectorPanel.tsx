@@ -373,6 +373,7 @@ export function InspectorPanel({
     height: '',
     objectHeight: '',
     elevation: '',
+    rotation: '',
     color: '#94a3b8',
   });
   const [labelDraft, setLabelDraft] = useState('');
@@ -396,6 +397,7 @@ export function InspectorPanel({
         height: '',
         objectHeight: '',
         elevation: '',
+        rotation: '',
         color: '#94a3b8',
       });
       setLabelDraft('');
@@ -409,10 +411,11 @@ export function InspectorPanel({
       height: String(Math.round(item.height)),
       objectHeight: String(Math.round(item.objectHeight)),
       elevation: String(Math.round(item.elevation)),
+      rotation: String(Math.round(item.rotation)),
       color: item.color,
     });
     setLabelDraft(item.label);
-  }, [item?.id, item?.x, item?.y, item?.width, item?.height, item?.objectHeight, item?.elevation, item?.color]);
+  }, [item?.id, item?.x, item?.y, item?.width, item?.height, item?.objectHeight, item?.elevation, item?.rotation, item?.color]);
 
   const handleSave = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -443,6 +446,7 @@ export function InspectorPanel({
     furnitureDraft.height,
     furnitureDraft.objectHeight,
     furnitureDraft.elevation,
+    furnitureDraft.rotation,
   ]) && Number(furnitureDraft.width) > 0 && Number(furnitureDraft.height) > 0 && Number(furnitureDraft.objectHeight) > 0 && isValidHexColor(furnitureDraft.color);
   const hasFurnitureChanges = !!item && (
     Number(furnitureDraft.x) !== Math.round(item.x) ||
@@ -451,6 +455,7 @@ export function InspectorPanel({
     Number(furnitureDraft.height) !== Math.round(item.height) ||
     Number(furnitureDraft.objectHeight) !== Math.round(item.objectHeight) ||
     Number(furnitureDraft.elevation) !== Math.round(item.elevation) ||
+    Number(furnitureDraft.rotation) !== Math.round(item.rotation) ||
     furnitureDraft.color.toLowerCase() !== item.color.toLowerCase()
   );
 
@@ -478,6 +483,7 @@ export function InspectorPanel({
       height: Number(furnitureDraft.height),
       objectHeight: Number(furnitureDraft.objectHeight),
       elevation: Number(furnitureDraft.elevation),
+      rotation: Number(furnitureDraft.rotation),
       color: furnitureDraft.color,
     });
   };
@@ -957,6 +963,19 @@ export function InspectorPanel({
             onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, elevation: event.target.value }))}
           />
         </label>
+        {item.kind === 'furniture' && (
+          <label>
+            <span>회전 각도 (°)</span>
+            <input
+              type="number"
+              min="0"
+              max="359"
+              step="1"
+              value={furnitureDraft.rotation}
+              onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, rotation: event.target.value }))}
+            />
+          </label>
+        )}
         <label className="color-field">
           <span>색상</span>
           <div className="color-input-row">
@@ -975,6 +994,19 @@ export function InspectorPanel({
             />
           </div>
         </label>
+        {item.kind === 'furniture' && (
+          <label className="rotation-slider-field">
+            <span>자유 회전</span>
+            <input
+              type="range"
+              min="0"
+              max="359"
+              step="1"
+              value={furnitureDraft.rotation}
+              onChange={(event) => setFurnitureDraft((currentDraft) => ({ ...currentDraft, rotation: event.target.value }))}
+            />
+          </label>
+        )}
       </div>
       <button type="submit" className="primary-button compact-button" disabled={!hasValidFurnitureDraft || !hasFurnitureChanges}>
         적용
@@ -1046,9 +1078,14 @@ export function InspectorPanel({
         {furnitureGeometrySection}
       </div>
 
-      <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
-        90도 회전
-      </button>
+      {item.kind === 'furniture' && (
+        <div className="rotation-controls">
+          <button type="button" className="primary-button" onClick={() => onRotate(item.id)}>
+            +90도 회전
+          </button>
+          <p>일반 가구는 0~359도 자유 회전이 가능합니다.</p>
+        </div>
+      )}
       
       {item.kind === 'door' && (
         <div className="door-options-panel">

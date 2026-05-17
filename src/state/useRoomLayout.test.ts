@@ -4,6 +4,7 @@ import { useRoomLayout } from './useRoomLayout';
 import { CURRENT_SCHEMA_VERSION } from './layoutStorage';
 import { buildSharedLayoutUrl, createSharedLayoutPayload } from './sharedLayout';
 import { createRectRoom } from '../utils/geometry';
+import { getRotatedSize } from '../types/layout';
 
 describe('useRoomLayout hook', () => {
   let storageState: Record<string, string>;
@@ -48,6 +49,35 @@ describe('useRoomLayout hook', () => {
     expect(result.current.selectedId).toBe(result.current.items[0].id);
   });
 
+  it('should add a wall-mounted storage item as wall-attached furniture', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('wall-mounted-storage');
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].templateId).toBe('wall-mounted-storage');
+    expect(result.current.items[0].isWallAttached).toBe(true);
+    expect(result.current.items[0].elevation).toBe(1200);
+    expect(result.current.items[0].wallSegmentId).toBeTruthy();
+  });
+
+  it('should add a full-height bookshelf as wall-attached furniture', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('full-height-bookshelf');
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].templateId).toBe('full-height-bookshelf');
+    expect(result.current.items[0].isWallAttached).toBe(true);
+    expect(result.current.items[0].objectHeight).toBe(2400);
+    expect(result.current.items[0].elevation).toBe(0);
+    expect(result.current.items[0].wallSegmentId).toBeTruthy();
+  });
+
   it('should move furniture within room bounds', () => {
     const { result } = renderHook(() => useRoomLayout());
     
@@ -63,6 +93,92 @@ describe('useRoomLayout hook', () => {
     
     expect(result.current.items[0].x).toBe(100);
     expect(result.current.items[0].y).toBe(100);
+  });
+
+  it('should allow arbitrary rotation for furniture', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('desk-neomin');
+    });
+
+    const itemId = result.current.items[0].id;
+
+    act(() => {
+      result.current.updateFurnitureGeometry(itemId, { rotation: 37 });
+    });
+
+    expect(result.current.items[0].rotation).toBe(37);
+  });
+
+  it('should keep quick rotate as a 90 degree increment', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('desk-neomin');
+    });
+
+    const itemId = result.current.items[0].id;
+
+    act(() => {
+      result.current.updateFurnitureGeometry(itemId, { rotation: 37 });
+    });
+
+    act(() => {
+      result.current.rotateFurniture(itemId);
+    });
+
+    expect(result.current.items[0].rotation).toBe(127);
+  });
+
+  it('should update rotation through the direct rotation setter', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('desk-neomin');
+    });
+
+    const itemId = result.current.items[0].id;
+
+    act(() => {
+      result.current.setFurnitureRotation(itemId, 212);
+    });
+
+    expect(result.current.items[0].rotation).toBe(212);
+  });
+
+  it('should preserve the visual center when rotation changes', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('desk-neomin');
+    });
+
+    const itemId = result.current.items[0].id;
+    act(() => {
+      result.current.moveFurniture(itemId, 1500, 1500);
+    });
+
+    const beforeItem = result.current.items[0];
+    const beforeFootprint = getRotatedSize(beforeItem);
+    const beforeCenter = {
+      x: beforeItem.x + beforeFootprint.width / 2,
+      y: beforeItem.y + beforeFootprint.height / 2,
+    };
+
+    act(() => {
+      result.current.setFurnitureRotation(itemId, 37);
+    });
+
+    const afterItem = result.current.items[0];
+    const afterFootprint = getRotatedSize(afterItem);
+    const afterCenter = {
+      x: afterItem.x + afterFootprint.width / 2,
+      y: afterItem.y + afterFootprint.height / 2,
+    };
+
+    expect(afterCenter.x).toBeCloseTo(beforeCenter.x, 5);
+    expect(afterCenter.y).toBeCloseTo(beforeCenter.y, 5);
   });
 
   it('should clamp furniture position within room bounds', () => {

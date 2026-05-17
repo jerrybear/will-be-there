@@ -206,8 +206,10 @@ function applyFurnitureGeometry(
   update: FurnitureGeometryUpdate,
   snapSize: SnapSize,
 ): PlacedFurniture {
-  const maxWidth = item.rotation === 90 ? roomValue.height : roomValue.width;
-  const maxHeight = item.rotation === 90 ? roomValue.width : roomValue.height;
+  const currentFootprint = getRotatedSize(item);
+  const nextRotation = update.rotation === undefined ? item.rotation : normalizeRotation(update.rotation);
+  const maxWidth = roomValue.width;
+  const maxHeight = roomValue.height;
   const nextWidth = update.width === undefined ? item.width : normalizeFurnitureSize(snapValue(update.width, snapSize), maxWidth);
   const nextHeight = update.height === undefined ? item.height : normalizeFurnitureSize(snapValue(update.height, snapSize), maxHeight);
   const nextObjectHeight = update.objectHeight === undefined
@@ -226,10 +228,16 @@ function applyFurnitureGeometry(
     objectHeight: nextObjectHeight,
     elevation: nextElevation,
     color: nextColor,
+    rotation: nextRotation,
   };
+  const nextFootprint = getRotatedSize(nextItem);
+  const centerPreservedX = item.x + currentFootprint.width / 2 - nextFootprint.width / 2;
+  const centerPreservedY = item.y + currentFootprint.height / 2 - nextFootprint.height / 2;
+  const resolvedX = update.x === undefined && !nextItem.isWallAttached ? centerPreservedX : nextX;
+  const resolvedY = update.y === undefined && !nextItem.isWallAttached ? centerPreservedY : nextY;
 
   if (nextItem.isWallAttached && (update.x !== undefined || update.y !== undefined)) {
-    const wallPlacement = snapPositionToWall(roomValue, nextItem, nextX, nextY);
+    const wallPlacement = snapPositionToWall(roomValue, nextItem, resolvedX, resolvedY);
 
     return {
       ...nextItem,
@@ -238,7 +246,7 @@ function applyFurnitureGeometry(
     };
   }
 
-  const position = clampPosition(roomValue, nextItem, nextX, nextY);
+  const position = clampPosition(roomValue, nextItem, resolvedX, resolvedY);
 
   return {
     ...nextItem,
@@ -650,6 +658,18 @@ export function useRoomLayout() {
     );
   };
 
+  const setFurnitureRotation = (id: string, rotation: number) => {
+    setItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.id !== id || item.kind !== 'furniture') {
+          return item;
+        }
+
+        return applyFurnitureGeometry(room, item, { rotation }, snapSize);
+      }),
+    );
+  };
+
   const renameFurniture = (id: string, label: string) => {
     const trimmedLabel = label.trim();
 
@@ -682,7 +702,7 @@ export function useRoomLayout() {
         }
 
         const wallRotationOffset = item.isWallAttached ? (item.wallRotationOffset === 90 ? 0 : 90) : item.wallRotationOffset;
-        const nextRotation: Rotation = item.isWallAttached ? normalizeRotation(item.rotation + 90) : item.rotation === 0 ? 90 : 0;
+        const nextRotation: Rotation = normalizeRotation(item.rotation + 90);
         const nextItem = { ...item, rotation: nextRotation, wallRotationOffset };
 
         return applyFurnitureGeometry(room, nextItem, { x: item.x, y: item.y }, snapSize);
@@ -1279,6 +1299,7 @@ export function useRoomLayout() {
     beginFurnitureMove,
     moveFurniture,
     updateFurnitureGeometry,
+    setFurnitureRotation,
     renameFurniture,
     rotateFurniture,
     updateDoorSwing,

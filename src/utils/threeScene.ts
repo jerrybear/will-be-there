@@ -796,168 +796,58 @@ function createSofaCushionGroup(item: PlacedFurniture, width: number, depth: num
   return group;
 }
 
-function createStorageBodyMaterials(item: PlacedFurniture, isSelected: boolean) {
+function createBookshelfTallGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
   const bodyMaterial = createFurnitureMaterial(item, isSelected);
-  const accentMaterial = new THREE.MeshStandardMaterial({
-    color: 0x4b5563,
-    roughness: 0.86,
-    metalness: 0.04,
+  const innerMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(item.color).offsetHSL(0, -0.02, -0.08),
+    roughness: 0.8,
+    metalness: 0.02,
   });
-  const shadowMaterial = new THREE.MeshStandardMaterial({
-    color: 0x2f2a25,
-    roughness: 0.92,
-    metalness: 0.01,
-  });
+  const panelThickness = Math.max(Math.min(width, depth) * 0.06, toWorldLength(1.8));
+  const shelfThickness = Math.max(height * 0.018, toWorldLength(1.8));
+  const innerWidth = width - panelThickness * 2;
+  const innerDepth = depth - panelThickness;
+  const compartmentRows = 6;
+  const shelfSpacing = (height - shelfThickness * 2) / compartmentRows;
 
-  return { bodyMaterial, accentMaterial, shadowMaterial };
-}
+  const leftSide = new THREE.Mesh(new THREE.BoxGeometry(panelThickness, height, depth), bodyMaterial);
+  leftSide.position.x = -width / 2 + panelThickness / 2;
+  group.add(leftSide);
 
-function addCabinetFeet(group: THREE.Group, width: number, depth: number, height: number) {
-  const legHeight = Math.max(height * 0.045, toWorldLength(2));
-  const legWidth = Math.max(Math.min(width, depth) * 0.028, toWorldLength(1.2));
-  const offsetX = width / 2 - legWidth * 1.8;
-  const offsetZ = depth / 2 - legWidth * 1.8;
-  const legMaterial = new THREE.MeshStandardMaterial({
-    color: 0x4b5563,
-    roughness: 0.72,
-    metalness: 0.18,
-  });
-  const legGeometry = new THREE.BoxGeometry(legWidth, legHeight, legWidth);
+  const rightSide = new THREE.Mesh(new THREE.BoxGeometry(panelThickness, height, depth), bodyMaterial);
+  rightSide.position.x = width / 2 - panelThickness / 2;
+  group.add(rightSide);
 
-  [
-    [-offsetX, -height / 2 + legHeight / 2, -offsetZ],
-    [offsetX, -height / 2 + legHeight / 2, -offsetZ],
-    [-offsetX, -height / 2 + legHeight / 2, offsetZ],
-    [offsetX, -height / 2 + legHeight / 2, offsetZ],
-  ].forEach(([x, y, z]) => {
-    const leg = new THREE.Mesh(legGeometry, legMaterial);
-    leg.position.set(x, y, z);
-    group.add(leg);
-  });
-}
+  const topPanel = new THREE.Mesh(new THREE.BoxGeometry(innerWidth, shelfThickness, depth), bodyMaterial);
+  topPanel.position.y = height / 2 - shelfThickness / 2;
+  group.add(topPanel);
 
-function addDrawerFrontGuides(
-  group: THREE.Group,
-  width: number,
-  depth: number,
-  height: number,
-  rows: number,
-  centerSplitRatio = 0.5,
-) {
-  const lineThickness = Math.max(Math.min(width, height) * 0.012, toWorldLength(0.8));
-  const inset = Math.max(lineThickness * 1.6, toWorldLength(1.6));
-  const frontZ = depth / 2 + lineThickness / 2;
-  const lineMaterial = new THREE.MeshStandardMaterial({
-    color: 0x5b534a,
-    roughness: 0.88,
-    metalness: 0.03,
-  });
+  const bottomPanel = new THREE.Mesh(new THREE.BoxGeometry(innerWidth, shelfThickness, depth), bodyMaterial);
+  bottomPanel.position.y = -height / 2 + shelfThickness / 2;
+  group.add(bottomPanel);
 
-  const splitX = -width / 2 + width * centerSplitRatio;
-  const vertical = new THREE.Mesh(new THREE.BoxGeometry(lineThickness, height - inset * 2, lineThickness), lineMaterial);
-  vertical.position.set(splitX, 0, frontZ);
-  group.add(vertical);
-
-  for (let row = 1; row < rows; row += 1) {
-    const y = -height / 2 + (height * row) / rows;
-    const horizontal = new THREE.Mesh(
-      new THREE.BoxGeometry(width - inset * 2, lineThickness, lineThickness),
-      lineMaterial,
-    );
-    horizontal.position.set(0, y, frontZ);
-    group.add(horizontal);
-  }
-}
-
-function createDresserWide3Group(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
-  const group = new THREE.Group();
-  const { bodyMaterial } = createStorageBodyMaterials(item, isSelected);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMaterial);
-  group.add(body);
-  addDrawerFrontGuides(group, width, depth, height, 3, 0.5);
-  addCabinetFeet(group, width, depth, height);
-
-  if (isSelected) {
-    addSelectionOutline(group, width, height, depth);
-  }
-
-  return group;
-}
-
-function createDresserTall4Group(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
-  const group = new THREE.Group();
-  const { bodyMaterial } = createStorageBodyMaterials(item, isSelected);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMaterial);
-  group.add(body);
-  addDrawerFrontGuides(group, width, depth, height, 4, 0.5);
-  addCabinetFeet(group, width, depth, height);
-
-  if (isSelected) {
-    addSelectionOutline(group, width, height, depth);
-  }
-
-  return group;
-}
-
-function createDresserTall5Group(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
-  const group = new THREE.Group();
-  const { bodyMaterial } = createStorageBodyMaterials(item, isSelected);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), bodyMaterial);
-  group.add(body);
-  addDrawerFrontGuides(group, width, depth, height, 5, 0.5);
-  addCabinetFeet(group, width, depth, height);
-
-  if (isSelected) {
-    addSelectionOutline(group, width, height, depth);
-  }
-
-  return group;
-}
-
-function createMediaConsoleGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
-  const group = new THREE.Group();
-  const { bodyMaterial, accentMaterial, shadowMaterial } = createStorageBodyMaterials(item, isSelected);
-  const legHeight = Math.max(height * 0.18, toWorldLength(9));
-  const cabinetHeight = height - legHeight;
-  const leftWidth = width * 0.24;
-  const centerWidth = width * 0.18;
-  const rightWidth = width - leftWidth - centerWidth;
-  const frontZ = depth / 2 + toWorldLength(0.6);
-
-  const leftCabinet = new THREE.Mesh(new THREE.BoxGeometry(leftWidth, cabinetHeight, depth), bodyMaterial);
-  leftCabinet.position.set(-width / 2 + leftWidth / 2, legHeight / 2, 0);
-  group.add(leftCabinet);
-
-  const rightCabinet = new THREE.Mesh(new THREE.BoxGeometry(rightWidth, cabinetHeight, depth), bodyMaterial);
-  rightCabinet.position.set(width / 2 - rightWidth / 2, legHeight / 2, 0);
-  group.add(rightCabinet);
-
-  const centerShelf = new THREE.Mesh(new THREE.BoxGeometry(centerWidth, cabinetHeight * 0.92, depth * 0.92), shadowMaterial);
-  centerShelf.position.set(-width / 2 + leftWidth + centerWidth / 2, legHeight / 2, 0);
-  group.add(centerShelf);
-
-  const centerDivider = new THREE.Mesh(
-    new THREE.BoxGeometry(toWorldLength(1.2), cabinetHeight * 0.92, depth * 0.92),
-    accentMaterial,
+  const backPanel = new THREE.Mesh(
+    new THREE.BoxGeometry(width - panelThickness * 1.2, height - shelfThickness * 1.2, panelThickness * 0.45),
+    innerMaterial,
   );
-  centerDivider.position.set(-width / 2 + leftWidth + centerWidth / 2, legHeight / 2, 0);
-  group.add(centerDivider);
+  backPanel.position.z = depth / 2 - panelThickness * 0.22;
+  group.add(backPanel);
 
-  const rightDrawerLine = new THREE.Mesh(
-    new THREE.BoxGeometry(rightWidth - toWorldLength(4), toWorldLength(1.2), toWorldLength(1.2)),
-    accentMaterial,
+  for (let shelfIndex = 1; shelfIndex < compartmentRows; shelfIndex += 1) {
+    const shelf = new THREE.Mesh(new THREE.BoxGeometry(innerWidth, shelfThickness, innerDepth), bodyMaterial);
+    shelf.position.y = -height / 2 + shelfSpacing * shelfIndex;
+    shelf.position.z = -panelThickness * 0.22;
+    group.add(shelf);
+  }
+
+  const dividerWidth = Math.max(panelThickness * 0.82, toWorldLength(1.6));
+  const divider = new THREE.Mesh(
+    new THREE.BoxGeometry(dividerWidth, height - shelfThickness * 2.4, innerDepth),
+    bodyMaterial,
   );
-  rightDrawerLine.position.set(width / 2 - rightWidth / 2, legHeight / 2, frontZ);
-  group.add(rightDrawerLine);
-
-  const leftDoorLine = new THREE.Mesh(
-    new THREE.BoxGeometry(toWorldLength(1.2), cabinetHeight * 0.78, toWorldLength(1.2)),
-    accentMaterial,
-  );
-  leftDoorLine.position.set(-width / 2 + leftWidth / 2, legHeight / 2, frontZ);
-  group.add(leftDoorLine);
-
-  addCabinetFeet(group, width, depth, height);
+  divider.position.z = -panelThickness * 0.22;
+  group.add(divider);
 
   if (isSelected) {
     addSelectionOutline(group, width, height, depth);
@@ -989,14 +879,8 @@ function createFurnitureGroupByModel(item: PlacedFurniture, width: number, depth
       return createBedFrameGroup(item, width, depth, height, isSelected);
     case 'sofa_cushion':
       return createSofaCushionGroup(item, width, depth, height, isSelected);
-    case 'dresser_wide_3':
-      return createDresserWide3Group(item, width, depth, height, isSelected);
-    case 'dresser_tall_4':
-      return createDresserTall4Group(item, width, depth, height, isSelected);
-    case 'dresser_tall_5':
-      return createDresserTall5Group(item, width, depth, height, isSelected);
-    case 'media_console':
-      return createMediaConsoleGroup(item, width, depth, height, isSelected);
+    case 'bookshelf_tall':
+      return createBookshelfTallGroup(item, width, depth, height, isSelected);
     case 'box':
     default:
       return createBoxGroup(item, width, depth, height, isSelected);

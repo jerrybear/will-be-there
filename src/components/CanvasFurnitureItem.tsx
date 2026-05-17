@@ -23,14 +23,14 @@ export function CanvasFurnitureItem({
   const footprint = getRotatedSize(item);
   const isDoor = item.kind === 'door';
   const normalizedRotation = ((item.rotation % 360) + 360) % 360;
-  const usesCssRotation = item.isWallAttached && normalizedRotation !== 0;
-  const renderWidth = item.isWallAttached ? item.width : footprint.width;
-  const renderHeight = item.isWallAttached ? item.height : footprint.height;
+  const usesCssRotation = normalizedRotation !== 0;
+  const renderWidth = usesCssRotation ? item.width : footprint.width;
+  const renderHeight = usesCssRotation ? item.height : footprint.height;
 
   const cx = item.x + footprint.width / 2;
   const cy = item.y + footprint.height / 2;
-  const renderLeft = item.isWallAttached ? cx - item.width / 2 : item.x;
-  const renderTop = item.isWallAttached ? cy - item.height / 2 : item.y;
+  const renderLeft = usesCssRotation ? cx - item.width / 2 : item.x;
+  const renderTop = usesCssRotation ? cy - item.height / 2 : item.y;
 
   return (
     <button
