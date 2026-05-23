@@ -4,10 +4,32 @@ export type LayoutElementKind = 'furniture' | 'door' | 'window';
 export type ViewMode = '2d' | '3d';
 export type RoomShapePreset = 'rect' | 'l-shape' | 'bay' | 'diagonal';
 export type FurnitureCategory = 'doors' | 'windows' | 'seating' | 'tables' | 'storage';
+export type SunlightMode = 'realistic' | 'manual';
+export type HomeOrientationPreset =
+  | 'N'
+  | 'NNE'
+  | 'NE'
+  | 'ENE'
+  | 'E'
+  | 'ESE'
+  | 'SE'
+  | 'SSE'
+  | 'S'
+  | 'SSW'
+  | 'SW'
+  | 'WSW'
+  | 'W'
+  | 'WNW'
+  | 'NW'
+  | 'NNW'
+  | 'custom';
+export type SunlightSeason = 'spring' | 'summer' | 'autumn' | 'winter';
+export type SunlightTimeOfDay = 'sunrise' | 'morning' | 'noon' | 'afternoon' | 'sunset';
 export type FurnitureThreeModel =
   | 'box'
   | 'desk_neomin'
   | 'desk_four_leg'
+  | 'desk_pedestal'
   | 'bed_frame'
   | 'sofa_cushion'
   | 'bookshelf_tall';
@@ -89,6 +111,18 @@ export interface LayoutNote extends Position {
   text: string;
 }
 
+export interface SunlightProfile {
+  mode: SunlightMode;
+  cityId: string;
+  latitude: number;
+  longitude: number;
+  homeOrientationPreset: HomeOrientationPreset;
+  customOrientationDegrees?: number;
+  season: SunlightSeason;
+  timeOfDay: SunlightTimeOfDay;
+  solarTimeMinutes?: number;
+}
+
 export interface FurnitureGeometryUpdate extends Partial<Size>, Partial<Position> {
   objectHeight?: number;
   elevation?: number;
@@ -113,6 +147,7 @@ export interface SavedLayout {
   memo: string;
   items: PlacedFurniture[];
   notes: LayoutNote[];
+  sunlightProfile: SunlightProfile;
   updatedAt: string;
 }
 

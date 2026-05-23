@@ -1,6 +1,7 @@
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
-import type { LayoutElementKind, LayoutNote, PlacedFurniture, Position, Room, RoomObstacle, SavedLayout, SavedRoom } from '../types/layout';
+import type { HomeOrientationPreset, LayoutElementKind, LayoutNote, PlacedFurniture, Position, Room, RoomObstacle, SavedLayout, SavedRoom, SunlightProfile, SunlightSeason, SunlightTimeOfDay } from '../types/layout';
 import { CURRENT_SCHEMA_VERSION, parseSavedLayoutsPayload, parseSavedRoomsPayload } from './layoutStorage';
+import { normalizeSunlightProfile } from '../utils/solarPosition';
 
 const SHARED_LAYOUT_HASH_KEY = 'share';
 const SHARED_LAYOUT_PAYLOAD_TYPE = 'shared-layout';
@@ -12,6 +13,7 @@ type CompactObstaclePolygon = ['p', string, string, CompactPoint[]];
 type CompactObstacle = CompactObstacleRect | CompactObstaclePolygon;
 type CompactItem = [string, string, string, string, LayoutElementKind, string, number, ...Array<string | number | boolean | undefined>];
 type CompactNote = [string, number, number, string];
+type CompactSunlightProfile = [SunlightProfile['mode'], string, number, number, HomeOrientationPreset, SunlightSeason, SunlightTimeOfDay, number?, number?];
 
 interface CompactSharedLayoutPayload {
   f: typeof COMPACT_SHARED_LAYOUT_FORMAT;
@@ -32,6 +34,7 @@ interface CompactSharedLayoutPayload {
     string?,
     CompactItem[]?,
     CompactNote[]?,
+    CompactSunlightProfile?,
   ];
 }
 
@@ -206,6 +209,40 @@ function fromCompactNote(note: CompactNote): LayoutNote {
   };
 }
 
+function toCompactSunlightProfile(profile: SunlightProfile): CompactSunlightProfile {
+  const normalizedProfile = normalizeSunlightProfile(profile);
+
+  return trimTrailingUndefined([
+    normalizedProfile.mode,
+    normalizedProfile.cityId,
+    roundShareNumber(normalizedProfile.latitude),
+    roundShareNumber(normalizedProfile.longitude),
+    normalizedProfile.homeOrientationPreset,
+    normalizedProfile.season,
+    normalizedProfile.timeOfDay,
+    normalizedProfile.customOrientationDegrees === undefined ? undefined : roundShareNumber(normalizedProfile.customOrientationDegrees),
+    normalizedProfile.solarTimeMinutes === undefined ? undefined : roundShareNumber(normalizedProfile.solarTimeMinutes),
+  ]) as CompactSunlightProfile;
+}
+
+function fromCompactSunlightProfile(profile: CompactSunlightProfile | undefined): SunlightProfile {
+  if (!profile) {
+    return normalizeSunlightProfile(undefined);
+  }
+
+  return normalizeSunlightProfile({
+    mode: profile[0],
+    cityId: profile[1],
+    latitude: profile[2],
+    longitude: profile[3],
+    homeOrientationPreset: profile[4],
+    season: profile[5],
+    timeOfDay: profile[6],
+    customOrientationDegrees: profile[7],
+    solarTimeMinutes: profile[8],
+  });
+}
+
 function isSharedLayoutPayload(value: unknown): value is SharedLayoutPayload {
   if (!value || typeof value !== 'object') {
     return false;
@@ -250,6 +287,7 @@ function compactSharedLayoutPayload(payload: SharedLayoutPayload): CompactShared
       payload.layout.memo || undefined,
       payload.layout.items.map(toCompactItem),
       payload.layout.notes.length > 0 ? payload.layout.notes.map(toCompactNote) : undefined,
+      toCompactSunlightProfile(payload.layout.sunlightProfile),
     ]) as CompactSharedLayoutPayload['l'],
   };
 }
@@ -281,6 +319,7 @@ function expandCompactSharedLayoutPayload(payload: CompactSharedLayoutPayload): 
     memo: payload.l[2] ?? '',
     items: (payload.l[3] ?? []).map(fromCompactItem),
     notes: (payload.l[4] ?? []).map(fromCompactNote),
+    sunlightProfile: fromCompactSunlightProfile(payload.l[5]),
     updatedAt: new Date(0).toISOString(),
   };
 
@@ -384,11 +423,12 @@ export function loadSharedLayoutFromHash(hash = canUseBrowserApis() ? window.loc
   }
 }
 
-export function createShareSnapshot(payload: SharedLayoutPayload): { room: Room; items: SavedLayout['items']; notes: LayoutNote[]; roomName: string; layoutName: string } {
+export function createShareSnapshot(payload: SharedLayoutPayload): { room: Room; items: SavedLayout['items']; notes: LayoutNote[]; sunlightProfile: SunlightProfile; roomName: string; layoutName: string } {
   return {
     room: payload.room.room,
     items: payload.layout.items,
     notes: payload.layout.notes,
+    sunlightProfile: payload.layout.sunlightProfile,
     roomName: payload.room.name,
     layoutName: payload.layout.name,
   };

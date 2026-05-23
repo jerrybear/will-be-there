@@ -74,6 +74,8 @@ export function createCeilingShadowBlocker(room: Room) {
 
 interface WallOpening {
   itemId: string;
+  templateId: string;
+  color: string;
   /** Distance from wall start to opening center, in room units */
   centerAlongWall: number;
   /** Opening width in room units */
@@ -133,6 +135,8 @@ function getOpeningsByWall(
 
     const opening: WallOpening = {
       itemId: item.id,
+      templateId: item.templateId,
+      color: item.color,
       centerAlongWall,
       width: item.width,
       depth: item.height,
@@ -300,6 +304,7 @@ function createDoorLeaf(
   }
 
   const leafThickness = Math.max(toWorldLength(opening.depth), toWorldLength(4));
+  const isSlidingDoor = opening.templateId === 'sliding-door';
   const hinge = opening.doorHinge ?? 'left';
   const swingDir = opening.doorSwingDir ?? 'front';
   const openAngle = THREE.MathUtils.degToRad(opening.doorOpenAngle ?? 90);
@@ -315,9 +320,10 @@ function createDoorLeaf(
   const pivot = new THREE.Group();
   pivot.userData.doorLeafFor = opening.itemId;
   pivot.userData.doorLeafOpenAngle = opening.doorOpenAngle ?? 90;
+  pivot.userData.isSlidingDoorLeaf = isSlidingDoor;
 
   const material = new THREE.MeshStandardMaterial({
-    color: 0xd6c2a7,
+    color: new THREE.Color(opening.color),
     roughness: 0.62,
     metalness: 0.03,
   });
@@ -325,7 +331,14 @@ function createDoorLeaf(
   leaf.castShadow = true;
   leaf.receiveShadow = true;
   leaf.userData.isDoorLeaf = true;
-  leaf.position.set(panelOffsetX, bottom + panelHeight / 2, panelOffsetZ);
+  if (isSlidingDoor) {
+    const openRatio = Math.max(0.18, Math.min((opening.doorOpenAngle ?? 90) / 120, 0.82));
+    const travelDistance = Math.max(panelWidth * 0.62, panelWidth * openRatio);
+    const slideDirection = hinge === 'left' ? -1 : 1;
+    leaf.position.set(slideDirection * travelDistance / 2, bottom + panelHeight / 2, wallThickness / 2 + leafThickness / 2 + 0.003);
+  } else {
+    leaf.position.set(panelOffsetX, bottom + panelHeight / 2, panelOffsetZ);
+  }
 
   const handleMaterial = new THREE.MeshStandardMaterial({
     color: 0x475569,
@@ -335,12 +348,14 @@ function createDoorLeaf(
   const handleWidth = Math.max(panelWidth * 0.045, toWorldLength(2.2));
   const handleHeight = Math.max(panelHeight * 0.08, toWorldLength(12));
   const handleDepth = Math.max(leafThickness * 0.45, toWorldLength(1.4));
-  const handleOffsetX = hinge === 'left'
-    ? panelWidth * 0.34
-    : -panelWidth * 0.34;
-  const handleOffsetZ = panelOffsetZ >= 0
+  const handleOffsetX = isSlidingDoor
+    ? (hinge === 'left' ? panelWidth * 0.18 : -panelWidth * 0.18)
+    : (hinge === 'left' ? panelWidth * 0.34 : -panelWidth * 0.34);
+  const handleOffsetZ = isSlidingDoor
     ? leafThickness / 2 + handleDepth / 2
-    : -leafThickness / 2 - handleDepth / 2;
+    : (panelOffsetZ >= 0
+        ? leafThickness / 2 + handleDepth / 2
+        : -leafThickness / 2 - handleDepth / 2);
 
   const handle = new THREE.Mesh(
     new THREE.BoxGeometry(handleWidth, handleHeight, handleDepth),
@@ -351,10 +366,18 @@ function createDoorLeaf(
   handle.userData.isDoorHandle = true;
   handle.position.set(handleOffsetX, bottom + panelHeight * 0.52, handleOffsetZ);
 
-  pivot.position.set(hingeOffsetX, 0, 0);
-  pivot.rotation.y = rotationDirection * openAngle;
-  pivot.add(leaf);
-  pivot.add(handle);
+  if (isSlidingDoor) {
+    const slideDirection = hinge === 'left' ? -1 : 1;
+    const travelDistance = Math.max(panelWidth * 0.62, panelWidth * Math.max(0.18, Math.min((opening.doorOpenAngle ?? 90) / 120, 0.82)));
+    pivot.position.set(center - wallLength / 2 + slideDirection * travelDistance / 2, 0, 0);
+    pivot.add(leaf);
+    pivot.add(handle);
+  } else {
+    pivot.position.set(hingeOffsetX, 0, 0);
+    pivot.rotation.y = rotationDirection * openAngle;
+    pivot.add(leaf);
+    pivot.add(handle);
+  }
 
   return pivot;
 }
@@ -721,6 +744,85 @@ function createDeskFourLegGroup(item: PlacedFurniture, width: number, depth: num
   return group;
 }
 
+function createDeskPedestalGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
+  const group = new THREE.Group();
+  const topMaterial = createFurnitureMaterial(item, isSelected);
+  const legMaterial = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    roughness: 0.78,
+    metalness: 0.08,
+  });
+  const drawerMaterial = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(item.color).offsetHSL(0, -0.03, -0.04),
+    roughness: 0.76,
+    metalness: 0.03,
+  });
+  const handleMaterial = new THREE.MeshStandardMaterial({
+    color: 0x475569,
+    roughness: 0.42,
+    metalness: 0.62,
+  });
+
+  const topThickness = Math.max(height * 0.08, toWorldLength(3));
+  const legSize = Math.max(Math.min(width, depth) * 0.07, toWorldLength(2.6));
+  const legHeight = Math.max(height - topThickness, toWorldLength(12));
+  const pedestalWidth = Math.max(width * 0.28, toWorldLength(34));
+  const pedestalInset = Math.max(depth * 0.08, toWorldLength(3.2));
+  const pedestalHeight = Math.max(height - topThickness, toWorldLength(18));
+  const pedestalDepth = depth - pedestalInset * 2;
+
+  const top = new THREE.Mesh(new THREE.BoxGeometry(width, topThickness, depth), topMaterial);
+  top.position.y = height / 2 - topThickness / 2;
+  group.add(top);
+
+  const legGeometry = new THREE.BoxGeometry(legSize, legHeight, legSize);
+  const freeSideX = -width / 2 + legSize * 1.4;
+  const offsetZ = depth / 2 - legSize * 1.2;
+  [
+    [freeSideX, -topThickness / 2, -offsetZ],
+    [freeSideX, -topThickness / 2, offsetZ],
+  ].forEach(([x, y, z]) => {
+    const leg = new THREE.Mesh(legGeometry, legMaterial);
+    leg.position.set(x, y, z);
+    group.add(leg);
+  });
+
+  const pedestal = new THREE.Mesh(
+    new THREE.BoxGeometry(pedestalWidth, pedestalHeight, pedestalDepth),
+    drawerMaterial,
+  );
+  pedestal.position.set(width / 2 - pedestalWidth / 2, -topThickness / 2, 0);
+  group.add(pedestal);
+
+  const drawerGapThickness = Math.max(pedestalHeight * 0.012, toWorldLength(0.6));
+  const drawerGapDepth = Math.max(pedestalDepth * 0.05, toWorldLength(0.8));
+  [-0.18, 0.08, 0.34].forEach((ratio) => {
+    const gap = new THREE.Mesh(
+      new THREE.BoxGeometry(pedestalWidth * 0.9, drawerGapThickness, drawerGapDepth),
+      handleMaterial,
+    );
+    gap.position.set(
+      width / 2 - pedestalWidth / 2,
+      -pedestalHeight / 2 + pedestalHeight * ratio,
+      pedestalDepth / 2 + drawerGapDepth / 2 - toWorldLength(0.6),
+    );
+    group.add(gap);
+  });
+
+  const modesty = new THREE.Mesh(
+    new THREE.BoxGeometry(width * 0.34, height * 0.28, Math.max(depth * 0.04, toWorldLength(1.8))),
+    legMaterial,
+  );
+  modesty.position.set(-width * 0.06, -height * 0.16, depth / 2 - Math.max(depth * 0.04, toWorldLength(1.8)) / 2);
+  group.add(modesty);
+
+  if (isSelected) {
+    addSelectionOutline(group, width, height, depth);
+  }
+
+  return group;
+}
+
 function createBedFrameGroup(item: PlacedFurniture, width: number, depth: number, height: number, isSelected: boolean) {
   const group = new THREE.Group();
   const frameMaterial = createFurnitureMaterial(item, isSelected);
@@ -875,6 +977,8 @@ function createFurnitureGroupByModel(item: PlacedFurniture, width: number, depth
       return createDeskNeominGroup(item, width, depth, height, isSelected);
     case 'desk_four_leg':
       return createDeskFourLegGroup(item, width, depth, height, isSelected);
+    case 'desk_pedestal':
+      return createDeskPedestalGroup(item, width, depth, height, isSelected);
     case 'bed_frame':
       return createBedFrameGroup(item, width, depth, height, isSelected);
     case 'sofa_cushion':

@@ -31,6 +31,26 @@ describe('threeScene detailed models', () => {
     expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(1);
   });
 
+  it('renders a pedestal desk with legs on one side and drawer cabinet on the other', () => {
+    const group = getFurnitureGroup({
+      id: 'desk-2',
+      templateId: 'desk-pedestal',
+      label: '서랍장 책상',
+      color: '#7ea792',
+      kind: 'furniture',
+      threeModel: 'desk_pedestal',
+      objectHeight: 74,
+      elevation: 0,
+      width: 140,
+      height: 70,
+      rotation: 0,
+      x: 20,
+      y: 20,
+    });
+
+    expect(group.children.filter((child) => child instanceof THREE.Mesh).length).toBeGreaterThan(5);
+  });
+
   it('keeps box model for generic custom furniture', () => {
     const group = getFurnitureGroup({
       id: 'custom-1',
@@ -232,5 +252,39 @@ describe('threeScene detailed models', () => {
 
     expect(pivot?.rotation.y).toBeCloseTo(Math.PI / 2, 3);
     expect(leafMesh?.position.z).toBeLessThan(0);
+  });
+
+  it('renders a selected sliding door as a laterally opened panel instead of a swing leaf', () => {
+    const room = createRectRoom(720, 480) as Room;
+    const door: PlacedFurniture = {
+      id: 'sliding-door-1',
+      templateId: 'sliding-door',
+      label: '방문 슬라이딩 도어',
+      color: '#ffffff',
+      kind: 'door',
+      threeModel: 'box',
+      objectHeight: 210,
+      elevation: 0,
+      width: 90,
+      height: 8,
+      rotation: 0,
+      x: 0,
+      y: 120,
+      isWallAttached: true,
+      wallSegmentId: 'point-3-point-0',
+      doorHinge: 'left',
+      doorSwingDir: 'front',
+      doorOpenAngle: 90,
+    };
+
+    const sceneObjects = createRoomSceneObjects(room, [door], door.id);
+    const wallObjects = sceneObjects.filter((object) => object.userData.wallSegmentId);
+    const doorWall = wallObjects.find((object) => object.userData.wallSegmentId === 'point-3-point-0');
+    const pivot = doorWall?.children.find((child) => child.userData.doorLeafFor === door.id) as THREE.Group | undefined;
+    const leafMesh = pivot?.children.find((child) => child.userData.isDoorLeaf) as THREE.Mesh | undefined;
+
+    expect(pivot?.userData.isSlidingDoorLeaf).toBe(true);
+    expect(pivot?.rotation.y ?? 0).toBeCloseTo(0, 6);
+    expect(leafMesh?.position.z).toBeGreaterThan(0);
   });
 });

@@ -20,6 +20,7 @@ export default function App() {
     catalog,
     items,
     notes,
+    sunlightProfile,
     selectedId,
     selectedItem,
     currentLayout,
@@ -45,6 +46,7 @@ export default function App() {
     renameFurniture,
     rotateFurniture,
     updateDoorSwing,
+    updateSunlightProfile,
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,
@@ -184,7 +186,13 @@ export default function App() {
           />
         ) : (
           <Suspense fallback={<section className="panel preview-panel" />}>
-            <Preview3DScene room={room} items={items} selectedId={selectedId} />
+            <Preview3DScene
+              room={room}
+              items={items}
+              selectedId={selectedId}
+              sunlightProfile={sunlightProfile}
+              onSunlightProfileChange={updateSunlightProfile}
+            />
           </Suspense>
         )}
         <InspectorPanel

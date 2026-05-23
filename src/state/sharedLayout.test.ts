@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SavedLayout, SavedRoom } from '../types/layout';
 import { createRectRoom } from '../utils/geometry';
+import { defaultSunlightProfile } from '../utils/solarPosition';
 import { CURRENT_SCHEMA_VERSION } from './layoutStorage';
 import { buildSharedLayoutUrl, createSharedLayoutPayload, deserializeSharedLayoutPayload, loadSharedLayoutFromHash, serializeSharedLayoutPayload } from './sharedLayout';
 
@@ -73,6 +74,15 @@ function createFixtureLayout(roomId: string): SavedLayout {
     notes: [
       { id: 'note-1', x: 1600, y: 700, text: '통로 확보 필요' },
     ],
+    sunlightProfile: {
+      ...defaultSunlightProfile,
+      cityId: 'jeju',
+      latitude: 33.4996,
+      longitude: 126.5312,
+      homeOrientationPreset: 'SSE',
+      season: 'winter',
+      timeOfDay: 'morning',
+    },
     updatedAt: '2026-05-13T09:00:00.000Z',
   };
 }
@@ -92,6 +102,8 @@ describe('sharedLayout', () => {
     expect(result.payload?.layout.items[1].doorHinge).toBe('right');
     expect(result.payload?.room.room.shape.obstacles).toHaveLength(1);
     expect(result.payload?.layout.notes[0].text).toBe('통로 확보 필요');
+    expect(result.payload?.layout.sunlightProfile.cityId).toBe('jeju');
+    expect(result.payload?.layout.sunlightProfile.homeOrientationPreset).toBe('SSE');
   });
 
   it('migrates older schema payloads on decode', () => {
@@ -107,6 +119,7 @@ describe('sharedLayout', () => {
       layout: {
         ...layout,
         schemaVersion: 3,
+        sunlightProfile: undefined,
       },
     };
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -115,6 +128,7 @@ describe('sharedLayout', () => {
     expect(decoded.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(decoded.room.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(decoded.layout.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(decoded.layout.sunlightProfile).toEqual(expect.objectContaining(defaultSunlightProfile));
   });
 
   it('produces a shorter encoded payload than the legacy base64 json share', () => {

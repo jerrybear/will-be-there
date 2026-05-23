@@ -82,6 +82,8 @@ function formatThreeModel(model: PlacedFurniture['threeModel']) {
       return '네오민 책상';
     case 'desk_four_leg':
       return '4다리 책상';
+    case 'desk_pedestal':
+      return '서랍장 책상';
     case 'bed_frame':
       return '프레임 침대';
     case 'sofa_cushion':
@@ -90,6 +92,10 @@ function formatThreeModel(model: PlacedFurniture['threeModel']) {
     default:
       return '기본 박스';
   }
+}
+
+function isSlidingDoor(item: PlacedFurniture) {
+  return item.kind === 'door' && item.templateId === 'sliding-door';
 }
 
 function formatRoomJson(room: Room) {
@@ -1089,75 +1095,102 @@ export function InspectorPanel({
       
       {item.kind === 'door' && (
         <div className="door-options-panel">
-          <label className="toggle-label">
-            <input
-              type="checkbox"
-              checked={!!item.showDoorSwing}
-              onChange={(e) => {
-                onUpdateDoorSwing(item.id, {
-                  showDoorSwing: e.target.checked,
-                  doorHinge: item.doorHinge || 'left',
-                  doorSwingDir: item.doorSwingDir || 'front',
-                  doorOpenAngle: item.doorOpenAngle ?? 90,
-                });
-              }}
-            />
-            <span>스윙 영역 표시</span>
-          </label>
-          <div className="door-swing-controls">
-            <div className="control-group">
-              <span>경첩</span>
-              <div className="segment-control">
-                <button
-                  type="button"
-                  className={item.doorHinge === 'left' ? 'active' : ''}
-                  onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
-                >
-                  왼쪽
-                </button>
-                <button
-                  type="button"
-                  className={item.doorHinge === 'right' ? 'active' : ''}
-                  onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
-                >
-                  오른쪽
-                </button>
+          {isSlidingDoor(item) ? (
+            <div className="door-swing-controls">
+              <div className="control-group">
+                <span>문짝 위치</span>
+                <div className="segment-control">
+                  <button
+                    type="button"
+                    className={item.doorHinge === 'left' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
+                  >
+                    왼쪽 겹침
+                  </button>
+                  <button
+                    type="button"
+                    className={item.doorHinge === 'right' ? 'active' : ''}
+                    onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
+                  >
+                    오른쪽 겹침
+                  </button>
+                </div>
               </div>
+              <p>슬라이딩 도어는 2D 스윙 호 없이, 3D에서 옆으로 열린 문짝으로 표시됩니다.</p>
             </div>
-            <div className="control-group">
-              <span>방향</span>
-              <div className="segment-control">
-                <button
-                  type="button"
-                  className={item.doorSwingDir === 'front' ? 'active' : ''}
-                  onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'front' })}
-                >
-                  앞쪽
-                </button>
-                <button
-                  type="button"
-                  className={item.doorSwingDir === 'back' ? 'active' : ''}
-                  onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'back' })}
-                >
-                  뒤쪽
-                </button>
-              </div>
-            </div>
-            <div className="control-group">
-              <label htmlFor="doorOpenAngle">
-                <span>열림각</span>
-                <span>{item.doorOpenAngle ?? 90}°</span>
+          ) : (
+            <>
+              <label className="toggle-label">
+                <input
+                  type="checkbox"
+                  checked={!!item.showDoorSwing}
+                  onChange={(e) => {
+                    onUpdateDoorSwing(item.id, {
+                      showDoorSwing: e.target.checked,
+                      doorHinge: item.doorHinge || 'left',
+                      doorSwingDir: item.doorSwingDir || 'front',
+                      doorOpenAngle: item.doorOpenAngle ?? 90,
+                    });
+                  }}
+                />
+                <span>스윙 영역 표시</span>
               </label>
-              <input
-                id="doorOpenAngle"
-                type="range"
-                min="0"
-                max="120"
-                value={item.doorOpenAngle ?? 90}
-                onChange={(e) => onUpdateDoorSwing(item.id, { doorOpenAngle: Number(e.target.value) })}
-              />
-            </div>
-          </div>
+              <div className="door-swing-controls">
+                <div className="control-group">
+                  <span>경첩</span>
+                  <div className="segment-control">
+                    <button
+                      type="button"
+                      className={item.doorHinge === 'left' ? 'active' : ''}
+                      onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'left' })}
+                    >
+                      왼쪽
+                    </button>
+                    <button
+                      type="button"
+                      className={item.doorHinge === 'right' ? 'active' : ''}
+                      onClick={() => onUpdateDoorSwing(item.id, { doorHinge: 'right' })}
+                    >
+                      오른쪽
+                    </button>
+                  </div>
+                </div>
+                <div className="control-group">
+                  <span>방향</span>
+                  <div className="segment-control">
+                    <button
+                      type="button"
+                      className={item.doorSwingDir === 'front' ? 'active' : ''}
+                      onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'front' })}
+                    >
+                      앞쪽
+                    </button>
+                    <button
+                      type="button"
+                      className={item.doorSwingDir === 'back' ? 'active' : ''}
+                      onClick={() => onUpdateDoorSwing(item.id, { doorSwingDir: 'back' })}
+                    >
+                      뒤쪽
+                    </button>
+                  </div>
+                </div>
+                <div className="control-group">
+                  <label htmlFor="doorOpenAngle">
+                    <span>열림각</span>
+                    <span>{item.doorOpenAngle ?? 90}°</span>
+                  </label>
+                  <input
+                    id="doorOpenAngle"
+                    type="range"
+                    min="0"
+                    max="120"
+                    value={item.doorOpenAngle ?? 90}
+                    onChange={(e) => onUpdateDoorSwing(item.id, { doorOpenAngle: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 

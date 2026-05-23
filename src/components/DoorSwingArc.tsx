@@ -6,7 +6,13 @@ interface DoorSwingArcProps {
 }
 
 function getDoorSwingStyle(item: PlacedFurniture): CSSProperties | null {
-  if (item.kind !== 'door' || !item.showDoorSwing || !item.doorHinge || !item.doorSwingDir) {
+  if (
+    item.kind !== 'door'
+    || item.templateId === 'sliding-door'
+    || !item.showDoorSwing
+    || !item.doorHinge
+    || !item.doorSwingDir
+  ) {
     return null;
   }
 

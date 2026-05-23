@@ -1326,9 +1326,180 @@ textarea {
   cursor: grabbing;
 }
 
+.room-direction-overlay {
+  position: absolute;
+  inset: 74px 20px 82px;
+  pointer-events: none;
+}
+
+.room-direction-label {
+  position: absolute;
+  min-width: 74px;
+  padding: 5px 8px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--primary-strong);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.room-direction-top {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.room-direction-right {
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.room-direction-bottom {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.room-direction-left {
+  top: 50%;
+  left: 0;
+  transform: translateY(-50%);
+}
+
+.sun-compass {
+  position: absolute;
+  left: 20px;
+  bottom: 20px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  max-width: min(360px, calc(100% - 40px));
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.36);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+.sun-compass-dial {
+  position: relative;
+  width: 62px;
+  height: 62px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at center, #ffffff 0 9px, transparent 10px),
+    linear-gradient(0deg, transparent calc(50% - 0.5px), rgba(148, 163, 184, 0.5) calc(50% - 0.5px), rgba(148, 163, 184, 0.5) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    linear-gradient(90deg, transparent calc(50% - 0.5px), rgba(148, 163, 184, 0.5) calc(50% - 0.5px), rgba(148, 163, 184, 0.5) calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+    rgba(248, 250, 252, 0.94);
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, 0.72);
+}
+
+.sun-compass-cardinal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+  transform-origin: 0 0;
+}
+
+.sun-compass-cardinal::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  content: '';
+  transform: translate(-50%, -50%);
+  z-index: -1;
+}
+
+.sun-compass-north-needle,
+.sun-compass-sun-marker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: 50% 100%;
+}
+
+.sun-compass-north-needle {
+  width: 0;
+  height: 0;
+  border-right: 5px solid transparent;
+  border-bottom: 25px solid #dc2626;
+  border-left: 5px solid transparent;
+  filter: drop-shadow(0 2px 2px rgba(15, 23, 42, 0.14));
+  transform: translate(-50%, -100%);
+}
+
+.sun-compass-north-needle::after {
+  position: absolute;
+  top: 22px;
+  left: -3px;
+  width: 6px;
+  height: 13px;
+  border-radius: 999px;
+  background: #64748b;
+  content: '';
+}
+
+.sun-compass-sun-marker {
+  width: 0;
+  height: 0;
+}
+
+.sun-compass-sun-marker::before {
+  position: absolute;
+  top: -30px;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  border-radius: 999px;
+  background: #fbbf24;
+  box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18);
+  content: '';
+}
+
+.sun-compass-labels {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.sun-compass-labels strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.sun-compass-labels b {
+  color: var(--text);
+  font-weight: 800;
+}
+
 .scene-control-section {
   display: grid;
   gap: 10px;
+}
+
+.scene-control-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .scene-control-compact {
@@ -1350,9 +1521,52 @@ textarea {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.orientation-quick-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.orientation-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.time-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.sun-time-control {
+  display: grid;
+  gap: 8px;
+}
+
+.sun-time-control label,
+.sun-time-scale {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.sun-time-control label strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.sun-time-control input[type='range'] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.sun-time-scale {
+  font-size: 11px;
+}
+
 .preview-top-toolbar button,
 .preview-view-control,
-.preset-button-grid button {
+.preset-button-grid button,
+.mode-toggle button,
+.text-toggle-button {
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--outline);
@@ -1363,6 +1577,25 @@ textarea {
   font-size: 12px;
 }
 
+.mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--outline);
+  border-radius: 12px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.mode-toggle button {
+  min-height: 28px;
+  border-radius: 9px;
+}
+
+.text-toggle-button {
+  justify-content: center;
+  background: rgba(248, 250, 252, 0.82);
+}
+
 .preview-view-control {
   display: inline-flex;
   align-items: center;
@@ -1371,7 +1604,8 @@ textarea {
 
 .preview-top-toolbar button.is-active,
 .preview-view-control.is-active,
-.preset-button-grid button.is-active {
+.preset-button-grid button.is-active,
+.mode-toggle button.is-active {
   background: #dbeafe;
   border-color: #93c5fd;
   color: var(--primary-strong);
@@ -1384,7 +1618,7 @@ textarea {
   right: 0;
   display: grid;
   gap: 12px;
-  min-width: 300px;
+  min-width: 380px;
   padding: 14px;
   border: 1px solid var(--outline);
   border-radius: 16px;
@@ -1396,6 +1630,29 @@ textarea {
   display: grid;
   gap: 12px;
   padding-top: 4px;
+}
+
+.compact-field {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.compact-field select,
+.compact-field input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--outline);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+}
+
+.sunlight-summary {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 @keyframes intersection-pulse {

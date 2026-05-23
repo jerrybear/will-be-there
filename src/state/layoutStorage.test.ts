@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseSavedLayoutsPayload } from './layoutStorage';
+import { defaultSunlightProfile } from '../utils/solarPosition';
 
 describe('layoutStorage door migration', () => {
   it('fills missing door swing defaults for legacy layouts', () => {
@@ -34,5 +35,6 @@ describe('layoutStorage door migration', () => {
     expect(migratedDoor?.doorHinge).toBe('left');
     expect(migratedDoor?.doorSwingDir).toBe('front');
     expect(migratedDoor?.doorOpenAngle).toBe(90);
+    expect(state.layouts[0]?.sunlightProfile).toEqual(defaultSunlightProfile);
   });
 });

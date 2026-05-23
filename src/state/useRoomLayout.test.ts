@@ -3,7 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useRoomLayout } from './useRoomLayout';
 import { CURRENT_SCHEMA_VERSION } from './layoutStorage';
 import { buildSharedLayoutUrl, createSharedLayoutPayload } from './sharedLayout';
-import { createRectRoom } from '../utils/geometry';
+import { defaultSunlightProfile } from '../utils/solarPosition';
+import { createRectRoom, createRoomShapeFromPreset, getItemPlacementRect, getRoomWallSegments, getSegmentAngle, projectPointToSegment } from '../utils/geometry';
 import { getRotatedSize } from '../types/layout';
 
 describe('useRoomLayout hook', () => {
@@ -75,6 +76,21 @@ describe('useRoomLayout hook', () => {
     expect(result.current.items[0].isWallAttached).toBe(true);
     expect(result.current.items[0].objectHeight).toBe(2400);
     expect(result.current.items[0].elevation).toBe(0);
+    expect(result.current.items[0].wallSegmentId).toBeTruthy();
+  });
+
+  it('should add a sliding door as a wall-attached door item', () => {
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.addFurniture('sliding-door');
+    });
+
+    expect(result.current.items).toHaveLength(1);
+    expect(result.current.items[0].templateId).toBe('sliding-door');
+    expect(result.current.items[0].kind).toBe('door');
+    expect(result.current.items[0].isWallAttached).toBe(true);
+    expect(result.current.items[0].showDoorSwing).toBe(false);
     expect(result.current.items[0].wallSegmentId).toBeTruthy();
   });
 
@@ -374,6 +390,12 @@ describe('useRoomLayout hook', () => {
       memo: '',
       items: [],
       notes: [{ id: 'note-1', x: 10, y: 20, text: '공유 메모' }],
+      sunlightProfile: {
+        ...defaultSunlightProfile,
+        cityId: 'jeju',
+        latitude: 33.4996,
+        longitude: 126.5312,
+      },
       updatedAt: '2026-05-13T01:00:00.000Z',
     };
 
@@ -384,8 +406,100 @@ describe('useRoomLayout hook', () => {
     expect(result.current.currentLayoutName).toBe('공유 도면');
     expect(result.current.room.width).toBe(7200);
     expect(result.current.notes[0].text).toBe('공유 메모');
+    expect(result.current.sunlightProfile.cityId).toBe('jeju');
     expect(result.current.savedRooms).toHaveLength(1);
     expect(result.current.savedRooms[0].id).toBe('room-local');
     expect(result.current.savedLayouts).toHaveLength(0);
+  });
+
+  it('should keep a wall-attached window snapped to a diagonal wall after loading a saved layout', () => {
+    const diagonalRoom = {
+      width: 4000,
+      height: 3500,
+      wallHeight: 2400,
+      shape: {
+        type: 'polygon' as const,
+        points: [
+          { id: 'point-0', x: 0, y: 0 },
+          { id: 'point-1', x: 4000, y: 0 },
+          { id: 'point-2', x: 4000, y: 2500 },
+          { id: 'point-3', x: 0, y: 3500 },
+        ],
+        obstacles: [],
+      },
+    };
+    const diagonalSegment = getRoomWallSegments(diagonalRoom).find((segment) => segment.id === 'point-2-point-3');
+
+    expect(diagonalSegment).toBeTruthy();
+
+    const itemRotation = Math.round(getSegmentAngle(diagonalSegment!));
+    const draftItem = {
+      id: 'window-1',
+      templateId: 'window',
+      label: '소형 창',
+      color: '#bae6fd',
+      kind: 'window' as const,
+      threeModel: 'box' as const,
+      objectHeight: 1200,
+      elevation: 900,
+      width: 1200,
+      height: 80,
+      rotation: itemRotation,
+      x: 1408,
+      y: 2817,
+      isWallAttached: true,
+      wallSegmentId: diagonalSegment!.id,
+      wallRotationOffset: 0 as const,
+    };
+
+    storageState['virtual-room-layout:saved-rooms'] = JSON.stringify({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      rooms: [
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: 'room-diagonal',
+          name: '사선 방',
+          memo: '',
+          room: diagonalRoom,
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      ],
+    });
+
+    storageState['virtual-room-layout:saved-layouts'] = JSON.stringify({
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      layouts: [
+        {
+          schemaVersion: CURRENT_SCHEMA_VERSION,
+          id: 'layout-diagonal',
+          roomId: 'room-diagonal',
+          name: '사선 창문 배치',
+          memo: '',
+          items: [draftItem],
+          notes: [],
+          sunlightProfile: defaultSunlightProfile,
+          updatedAt: '2026-05-18T00:00:00.000Z',
+        },
+      ],
+    });
+
+    const { result } = renderHook(() => useRoomLayout());
+
+    act(() => {
+      result.current.loadLayout('layout-diagonal');
+    });
+
+    const loadedItem = result.current.items[0];
+    expect(Math.abs(loadedItem.x - draftItem.x)).toBeLessThan(1);
+    expect(Math.abs(loadedItem.y - draftItem.y)).toBeLessThan(1);
+    const placementRect = getItemPlacementRect(loadedItem, loadedItem.x, loadedItem.y);
+    const center = {
+      x: placementRect.x + placementRect.width / 2,
+      y: placementRect.y + placementRect.height / 2,
+    };
+    const projection = projectPointToSegment(center, diagonalSegment!);
+
+    expect(loadedItem.wallSegmentId).toBe(diagonalSegment!.id);
+    expect(Math.hypot(center.x - projection.x, center.y - projection.y)).toBeLessThan(1);
   });
 });

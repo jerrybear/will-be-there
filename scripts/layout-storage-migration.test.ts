@@ -69,8 +69,8 @@ assertEqual(arrayLayout.memo, '');
 assertEqual(arrayRoom.room.shape.type, 'polygon');
 assertEqual(arrayRoom.room.shape.points.length, 4);
 assertEqual(arrayLayout.items[0].kind, 'window');
-assertEqual(arrayLayout.items[0].objectHeight, 100);
-assertEqual(arrayLayout.items[0].elevation, 90);
+assertEqual(arrayLayout.items[0].objectHeight, 1200);
+assertEqual(arrayLayout.items[0].elevation, 900);
 assertEqual(arrayLayout.items[0].isWallAttached, true);
 
 const objectState = parseSavedLayoutsPayload(legacyObjectPayload);
@@ -83,7 +83,7 @@ assertEqual(objectLayout.roomId, objectRoom.id);
 assertEqual(objectRoom.room.shape.type, 'polygon');
 assertEqual(objectRoom.room.shape.points[2].x, 640);
 assertEqual(objectLayout.items[0].kind, 'door');
-assertEqual(objectLayout.items[0].objectHeight, 210);
+assertEqual(objectLayout.items[0].objectHeight, 2100);
 assertEqual(objectLayout.items[0].elevation, 0);
 assertEqual(objectLayout.items[0].isWallAttached, true);
 
@@ -96,6 +96,7 @@ assertEqual(persistedPayload.layouts[0].schemaVersion, CURRENT_SCHEMA_VERSION);
 const diagonalRoom = {
   width: 720,
   height: 480,
+  wallHeight: 240,
   shape: createRoomShapeFromPreset(720, 480, 'diagonal'),
 };
 

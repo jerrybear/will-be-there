@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { CustomFurnitureTemplate, CustomFurnitureTemplateDraft, FurnitureGeometryUpdate, FurnitureTemplate, LayoutNote, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize } from '../types/layout';
+import type { CustomFurnitureTemplate, CustomFurnitureTemplateDraft, FurnitureGeometryUpdate, FurnitureTemplate, LayoutNote, PlacedFurniture, Room, RoomObstacle, RoomShapePreset, Rotation, SavedLayout, SavedRoom, SnapSize, SunlightProfile } from '../types/layout';
 import { getRotatedSize } from '../types/layout';
 import {
   createRectRoom,
@@ -8,15 +8,18 @@ import {
   getItemPlacementRect,
   getNearestWallProjection,
   getRoomShape,
+  getRoomWallSegments,
   getSegmentAngle,
   hasPolygonSelfIntersection,
   isRectInsideRoom,
   normalizeRotation,
+  projectPointToSegment,
   rectFromItem,
   rectsOverlap,
 } from '../utils/geometry';
 import { CURRENT_SCHEMA_VERSION, loadCustomFurnitureCatalog, loadWorkspaceState, persistCustomFurnitureCatalog, persistSavedLayouts, persistSavedRooms } from './layoutStorage';
 import { buildSharedLayoutUrl, createSharedLayoutPayload, createShareSnapshot, loadSharedLayoutFromHash } from './sharedLayout';
+import { defaultSunlightProfile, normalizeSunlightProfile } from '../utils/solarPosition';
 
 const DEFAULT_ROOM: Room = createRectRoom(7200, 4800);
 
@@ -35,6 +38,7 @@ interface LayoutHistorySnapshot {
   room: Room;
   items: PlacedFurniture[];
   notes: LayoutNote[];
+  sunlightProfile: SunlightProfile;
   selectedId: string | null;
   currentRoomId: string | null;
   currentLayoutId: string | null;
@@ -140,14 +144,24 @@ function findNearestValidPosition(
 
 function snapPositionToWall(
   roomValue: Room,
-  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation' | 'wallRotationOffset'>,
+  item: Pick<PlacedFurniture, 'width' | 'height' | 'rotation' | 'wallRotationOffset' | 'wallSegmentId'>,
   x: number,
   y: number,
 ) {
   const currentFootprint = getRotatedSize(item);
   const centerX = x + currentFootprint.width / 2;
   const centerY = y + currentFootprint.height / 2;
-  const projection = getNearestWallProjection(roomValue, { x: centerX, y: centerY });
+  const roomSegments = getRoomWallSegments(roomValue);
+  const assignedSegment = item.wallSegmentId
+    ? roomSegments.find((segment) => segment.id === item.wallSegmentId)
+    : null;
+  const nearestProjection = assignedSegment
+    ? {
+        segment: assignedSegment,
+        projection: projectPointToSegment({ x: centerX, y: centerY }, assignedSegment),
+      }
+    : getNearestWallProjection(roomValue, { x: centerX, y: centerY });
+  const projection = nearestProjection;
 
   if (!projection) {
     return {
@@ -272,10 +286,31 @@ function normalizeRoomSize(width: number, height: number, wallHeight: number): R
 }
 
 function clampItemsToRoom(roomValue: Room, itemsValue: PlacedFurniture[]) {
-  return itemsValue.map((item) => ({
-    ...item,
-    ...clampPosition(roomValue, item, item.x, item.y),
-  }));
+  return itemsValue.map((item) => {
+    if (item.isWallAttached) {
+      const currentPlacementRect = getItemPlacementRect(item, item.x, item.y);
+      const hasAssignedWall = item.wallSegmentId
+        ? getRoomWallSegments(roomValue).some((segment) => segment.id === item.wallSegmentId)
+        : false;
+
+      if (hasAssignedWall && isRectInsideRoom(roomValue, currentPlacementRect)) {
+        return item;
+      }
+
+      const wallPlacement = snapPositionToWall(roomValue, item, item.x, item.y);
+
+      return {
+        ...item,
+        ...wallPlacement.item,
+        ...wallPlacement.position,
+      };
+    }
+
+    return {
+      ...item,
+      ...clampPosition(roomValue, item, item.x, item.y),
+    };
+  });
 }
 
 function getSwingBounds(item: PlacedFurniture): { x: number, y: number, width: number, height: number } | null {
@@ -400,6 +435,7 @@ export function useRoomLayout() {
   const [room, setRoom] = useState<Room>(() => initialShareSnapshot?.room ?? DEFAULT_ROOM);
   const [items, setItems] = useState<PlacedFurniture[]>(() => initialShareSnapshot?.items ?? []);
   const [notes, setNotes] = useState<LayoutNote[]>(() => initialShareSnapshot?.notes ?? []);
+  const [sunlightProfile, setSunlightProfile] = useState<SunlightProfile>(() => initialShareSnapshot?.sunlightProfile ?? defaultSunlightProfile);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<PlacedFurniture | null>(null);
   const [snapSize, setSnapSize] = useState<SnapSize>(0);
@@ -412,8 +448,8 @@ export function useRoomLayout() {
   const [futureLayouts, setFutureLayouts] = useState<LayoutHistorySnapshot[]>([]);
   const [sharedLayoutName, setSharedLayoutName] = useState<string | null>(() => initialShareSnapshot?.layoutName ?? null);
   const [sharedRoomName, setSharedRoomName] = useState<string | null>(() => initialShareSnapshot?.roomName ?? null);
-  const [sharedBaseline, setSharedBaseline] = useState<{ room: Room; items: PlacedFurniture[]; notes: LayoutNote[] } | null>(
-    () => (initialShareSnapshot ? { room: initialShareSnapshot.room, items: initialShareSnapshot.items, notes: initialShareSnapshot.notes } : null),
+  const [sharedBaseline, setSharedBaseline] = useState<{ room: Room; items: PlacedFurniture[]; notes: LayoutNote[]; sunlightProfile: SunlightProfile } | null>(
+    () => (initialShareSnapshot ? { room: initialShareSnapshot.room, items: initialShareSnapshot.items, notes: initialShareSnapshot.notes, sunlightProfile: initialShareSnapshot.sunlightProfile } : null),
   );
   const [sharedLayoutError, setSharedLayoutError] = useState<string | null>(() => initialSharedLayoutState.error);
 
@@ -440,18 +476,21 @@ export function useRoomLayout() {
   const hasUnsavedChanges = useMemo(() => {
     if (!currentLayout) {
       if (sharedBaseline) {
-        return JSON.stringify(items) !== JSON.stringify(sharedBaseline.items) || JSON.stringify(notes) !== JSON.stringify(sharedBaseline.notes);
+        return JSON.stringify(items) !== JSON.stringify(sharedBaseline.items)
+          || JSON.stringify(notes) !== JSON.stringify(sharedBaseline.notes)
+          || JSON.stringify(sunlightProfile) !== JSON.stringify(sharedBaseline.sunlightProfile);
       }
 
-      return items.length > 0 || notes.length > 0;
+      return items.length > 0 || notes.length > 0 || JSON.stringify(sunlightProfile) !== JSON.stringify(defaultSunlightProfile);
     }
 
     return (
       JSON.stringify(items) !== JSON.stringify(currentLayout.items) ||
       JSON.stringify(notes) !== JSON.stringify(currentLayout.notes) ||
+      JSON.stringify(sunlightProfile) !== JSON.stringify(currentLayout.sunlightProfile) ||
       currentLayout.roomId !== currentRoomId
     );
-  }, [currentLayout, currentRoomId, items, notes]);
+  }, [currentLayout, currentRoomId, items, notes, sharedBaseline, sunlightProfile]);
 
   const hasUnsavedRoomChanges = useMemo(() => {
     if (!currentRoom) {
@@ -506,6 +545,7 @@ export function useRoomLayout() {
     room,
     items,
     notes,
+    sunlightProfile,
     selectedId,
     currentRoomId,
     currentLayoutId,
@@ -518,6 +558,7 @@ export function useRoomLayout() {
     setRoom(snapshot.room);
     setItems(snapshot.items);
     setNotes(snapshot.notes);
+    setSunlightProfile(snapshot.sunlightProfile);
     setSelectedId(snapshot.selectedId);
     setCurrentRoomId(snapshot.currentRoomId);
     setCurrentLayoutId(snapshot.currentLayoutId);
@@ -783,6 +824,7 @@ export function useRoomLayout() {
     setRoom(DEFAULT_ROOM);
     setItems([]);
     setNotes([]);
+    setSunlightProfile(defaultSunlightProfile);
     setSelectedId(null);
     setCurrentRoomId(null);
     setCurrentLayoutId(null);
@@ -1095,6 +1137,7 @@ export function useRoomLayout() {
     setRoom(savedRoom.room);
     setItems([]);
     setNotes([]);
+    setSunlightProfile(defaultSunlightProfile);
     setSelectedId(null);
     setCurrentRoomId(savedRoom.id);
     setCurrentLayoutId(null);
@@ -1137,6 +1180,7 @@ export function useRoomLayout() {
     const nextLayout: SavedLayout = {
       schemaVersion: CURRENT_SCHEMA_VERSION,
       notes,
+      sunlightProfile,
       id: createSavedLayoutId(),
       roomId,
       name: trimmedName,
@@ -1178,6 +1222,7 @@ export function useRoomLayout() {
     setRoom(layoutRoom.room);
     setItems(clampItemsToRoom(layoutRoom.room, layout.items));
     setNotes(layout.notes);
+    setSunlightProfile(layout.sunlightProfile);
     setSelectedId(null);
     setCurrentRoomId(layoutRoom.id);
     setCurrentLayoutId(layout.id);
@@ -1210,6 +1255,7 @@ export function useRoomLayout() {
           roomId: currentRoomId ?? layout.roomId,
           items,
           notes,
+          sunlightProfile,
           updatedAt: new Date().toISOString(),
         };
       });
@@ -1257,6 +1303,7 @@ export function useRoomLayout() {
           roomId: activeRoom.id,
           items,
           notes,
+          sunlightProfile,
         }
       : {
           schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -1266,6 +1313,7 @@ export function useRoomLayout() {
           memo: '',
           items,
           notes,
+          sunlightProfile,
           updatedAt: new Date().toISOString(),
         };
 
@@ -1278,6 +1326,7 @@ export function useRoomLayout() {
     customFurnitureCatalog,
     items,
     notes,
+    sunlightProfile,
     selectedId,
     selectedItem,
     currentLayout,
@@ -1306,6 +1355,9 @@ export function useRoomLayout() {
     duplicateFurniture,
     deleteFurniture,
     setSnapSize,
+    updateSunlightProfile: (update: Partial<SunlightProfile>) => {
+      setSunlightProfile((currentProfile) => normalizeSunlightProfile({ ...currentProfile, ...update }));
+    },
     resetLayout,
     resizeRoom,
     applyRoomShapePreset,

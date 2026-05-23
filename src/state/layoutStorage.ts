@@ -1,11 +1,12 @@
 import { furnitureCatalog } from '../data/furnitureCatalog';
-import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, LayoutNote, PlacedFurniture, Room, SavedLayout, SavedRoom } from '../types/layout';
+import type { CustomFurnitureTemplate, FurnitureCategory, FurnitureThreeModel, LayoutElementKind, LayoutNote, PlacedFurniture, Room, SavedLayout, SavedRoom, SunlightProfile } from '../types/layout';
 import { createRectRoomShape, DEFAULT_WALL_HEIGHT, normalizeRoomShapePointIds } from '../utils/geometry';
+import { normalizeSunlightProfile } from '../utils/solarPosition';
 
 const LAYOUT_STORAGE_KEY = 'virtual-room-layout:saved-layouts';
 const ROOM_STORAGE_KEY = 'virtual-room-layout:saved-rooms';
 const CUSTOM_FURNITURE_STORAGE_KEY = 'virtual-room-layout:custom-furniture-catalog';
-export const CURRENT_SCHEMA_VERSION = 8;
+export const CURRENT_SCHEMA_VERSION = 9;
 
 interface StoredLayoutsPayload {
   schemaVersion: number;
@@ -36,6 +37,7 @@ type LegacySavedLayout = {
   room?: Room;
   items: PlacedFurniture[];
   notes?: LayoutNote[];
+  sunlightProfile?: SunlightProfile;
   updatedAt: string;
 };
 
@@ -106,7 +108,12 @@ function isFurnitureCategory(value: unknown): value is FurnitureCategory {
 }
 
 function isFurnitureThreeModel(value: unknown): value is FurnitureThreeModel {
-  return value === 'box' || value === 'desk_neomin' || value === 'desk_four_leg' || value === 'bed_frame' || value === 'sofa_cushion';
+  return value === 'box'
+    || value === 'desk_neomin'
+    || value === 'desk_four_leg'
+    || value === 'bed_frame'
+    || value === 'sofa_cushion'
+    || value === 'bookshelf_tall';
 }
 
 function isCustomFurnitureTemplate(value: unknown): value is CustomFurnitureTemplate {
@@ -141,6 +148,11 @@ function isStoredCustomFurniturePayload(value: unknown): value is StoredCustomFu
 function inferElementKind(item: Partial<PlacedFurniture>): LayoutElementKind {
   if (item.kind) {
     return item.kind;
+  }
+
+  const catalogDefaults = getCatalogDefaults(item);
+  if (catalogDefaults?.kind) {
+    return catalogDefaults.kind;
   }
 
   if (item.templateId === 'door') {
@@ -237,6 +249,7 @@ function migrateSavedLayout(layout: LegacySavedLayout, fallbackRoomId: string): 
     notes: Array.isArray(layout.notes)
       ? layout.notes.filter((note): note is LayoutNote => !!note && typeof note.id === 'string' && typeof note.text === 'string' && typeof note.x === 'number' && typeof note.y === 'number')
       : [],
+    sunlightProfile: normalizeSunlightProfile(layout.sunlightProfile),
     updatedAt: layout.updatedAt,
   };
 }
